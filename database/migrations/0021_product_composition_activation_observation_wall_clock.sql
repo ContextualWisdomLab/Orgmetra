@@ -1,6 +1,24 @@
 -- Reject owner-operation observations that claim knowledge from the future or are already stale.
 -- Application validation performs the same check before persistence, but current production
 -- PostgreSQL truth must enforce the temporal evidence boundary independently of caller code.
+-- Existing future-dated history cannot be grandfathered into the stronger authority boundary.
+
+DO $$
+DECLARE
+    wall_clock_unix_ms bigint;
+BEGIN
+    wall_clock_unix_ms := floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint;
+
+    IF EXISTS (
+        SELECT 1
+        FROM public.product_composition_activation_owner_observation
+        WHERE observed_at_unix_ms > wall_clock_unix_ms
+    ) THEN
+        RAISE EXCEPTION
+            'product composition activation registry contains future-dated owner observation history';
+    END IF;
+END;
+$$;
 
 CREATE FUNCTION validate_product_composition_activation_observation_wall_clock()
 RETURNS trigger
