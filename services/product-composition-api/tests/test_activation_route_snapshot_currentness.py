@@ -153,7 +153,13 @@ def _registry(row, *, on_connect=None):
     return registry, cursor
 
 
-def _current_row(snapshot, *, sequence: int = 1, now_unix_ms: int = 1_500):
+def _current_row(
+    snapshot,
+    *,
+    sequence: int = 1,
+    recovered_at_unix_ms: int = 1_250,
+    now_unix_ms: int = 1_500,
+):
     event = snapshot.event
     return (
         sequence,
@@ -161,6 +167,8 @@ def _current_row(snapshot, *, sequence: int = 1, now_unix_ms: int = 1_500):
         event.previous_generation_id,
         event.event_kind,
         event.evidence_bundle_sha256,
+        snapshot.evidence.bundle_sha256(),
+        recovered_at_unix_ms,
         now_unix_ms,
     )
 
@@ -174,7 +182,12 @@ def test_current_route_ids_are_linearized_by_durable_state_and_database_clock() 
     sql, parameters = cursor.executions[0]
     assert "clock_timestamp()" in sql
     assert "public.product_composition_activation_event" in sql
-    assert parameters == (deployment.deployment_id, deployment.environment_id)
+    assert "public.product_composition_recovery_attestation" in sql
+    assert parameters == (
+        deployment.deployment_id,
+        deployment.environment_id,
+        snapshot.evidence.bundle_sha256(),
+    )
 
 
 def test_current_route_ids_reject_superseded_activation_sequence() -> None:
@@ -249,7 +262,15 @@ def test_current_route_ids_reject_missing_durable_activation() -> None:
     "row",
     [
         [],
-        (1, "generation_serving_currentness", None, "activate", "a" * 64),
+        (
+            1,
+            "generation_serving_currentness",
+            None,
+            "activate",
+            "a" * 64,
+            "b" * 64,
+            1_250,
+        ),
     ],
 )
 def test_current_route_ids_reject_invalid_query_shape(row) -> None:
@@ -269,8 +290,11 @@ def test_current_route_ids_reject_invalid_query_shape(row) -> None:
         (2, object(), "previous generation id"),
         (3, object(), "event kind"),
         (4, object(), "evidence digest"),
-        (5, True, "database wall clock"),
-        (5, 0, "database wall clock"),
+        (5, object(), "recovery evidence digest"),
+        (6, True, "recovery timestamp"),
+        (6, 0, "recovery timestamp"),
+        (7, True, "database wall clock"),
+        (7, 0, "database wall clock"),
     ],
 )
 def test_current_route_ids_reject_invalid_durable_field_types(
