@@ -246,3 +246,13 @@ def test_current_route_ids_reject_submillisecond_database_wall_clock_rewind() ->
 
     with pytest.raises(ActivationAuthorizationError, match="behind recovery attestation"):
         current_route_ids_for_snapshot(registry, deployment, snapshot)
+
+
+def test_current_route_ids_reject_non_boolean_recovery_clock_ordering() -> None:
+    deployment, snapshot = _snapshot()
+    row = list(_current_row(snapshot))
+    row[9] = 1
+    registry, _ = _registry(tuple(row))
+
+    with pytest.raises(ActivationAuthorizationError, match="clock ordering"):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
