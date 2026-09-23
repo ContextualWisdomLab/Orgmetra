@@ -80,10 +80,6 @@ def _build_method_rejection_authority_runtime():
         """Record the one canonical method set issued with an error instance."""
 
         with state_lock:
-            if error in issued:
-                raise CompositionRoutingError(
-                    "method rejection authority was already issued for this error"
-                )
             issued[error] = error.allowed_methods
 
     def require(error: CompositionMethodNotAllowedError) -> tuple[str, ...]:
