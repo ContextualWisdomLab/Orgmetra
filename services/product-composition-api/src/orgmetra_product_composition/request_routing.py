@@ -38,13 +38,13 @@ class CompositionMethodNotImplementedError(CompositionRoutingError):
 
 
 class CompositionMethodNotAllowedError(CompositionRoutingError):
-    """Raised with the exact declared methods when one selected Path Item rejects the method."""
+    """Raised with current methods when one selected Path Item rejects the request method."""
 
     def __init__(self, message: str, *, allowed_methods: tuple[object, ...]) -> None:
-        """Freeze one canonical non-empty Allow authority for later HTTP mapping."""
+        """Freeze one canonical Allow authority, including a valid temporarily empty authority."""
 
-        if type(allowed_methods) is not tuple or not allowed_methods:
-            raise CompositionRoutingError("method rejection requires declared Allow authority")
+        if type(allowed_methods) is not tuple:
+            raise CompositionRoutingError("method rejection requires tuple Allow authority")
         canonical_methods = tuple(
             sorted({_canonical_request_method(method) for method in allowed_methods})
         )
@@ -125,14 +125,12 @@ def current_route_id_for_request(
 ) -> str:
     """Return the current stable route ID for one canonical request or fail closed.
 
-    Request syntax and server method capability are resolved before declared path/method authority
-    or PostgreSQL use. Only a request using the fixed composition method profile can select one
-    admitted Path Item. A selected route then crosses ``current_route_ids_for_snapshot`` for durable
-    activation/recovery currentness. Selection runs over the complete declared generation first,
-    applies concrete-before-template precedence, chooses only an explicitly declared method, and
-    checks positive route availability last. This ordering prevents unnecessary durable-state reads,
-    preserves the HTTP distinction between unimplemented methods and resource-specific rejection,
-    and prevents an unavailable optional concrete Path Item from widening into a template route.
+    Request syntax and server method capability are resolved before declared Path Item selection.
+    A selected path crosses ``current_route_ids_for_snapshot`` when needed either to advertise the
+    resource's current RFC 9110 ``Allow`` authority or to prove the requested route is serviceable.
+    Selection runs over the complete declared generation first and applies concrete-before-template
+    precedence before availability is considered. This preserves deterministic path authority while
+    preventing an unavailable optional concrete Path Item from widening into a template route.
     """
 
     canonical_method = _canonical_request_method(method)
@@ -148,8 +146,18 @@ def current_route_id_for_request(
         route for route in path_routes if canonical_method in route.methods
     )
     if not method_routes:
+        available_route_ids = frozenset(
+            current_route_ids_for_snapshot(registry, deployment, snapshot)
+        )
         allowed_methods = tuple(
-            sorted({method for route in path_routes for method in route.methods})
+            sorted(
+                {
+                    method
+                    for route in path_routes
+                    if route.route_id in available_route_ids
+                    for method in route.methods
+                }
+            )
         )
         raise CompositionMethodNotAllowedError(
             "selected declared Path Item does not admit request method",
