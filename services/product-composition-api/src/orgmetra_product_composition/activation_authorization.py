@@ -683,7 +683,8 @@ def _persist_activation_evidence(cursor: Any, evidence: ActivationAdmissionEvide
             ),
         )
     cursor.execute(_SELECT_OBSERVATIONS_SQL, (bundle_sha256,))
-    if tuple(cursor.fetchall()) != evidence._observation_rows():
+    durable_rows = tuple(sorted(cursor.fetchall(), key=lambda row: (row[0], row[1])))
+    if durable_rows != evidence._observation_rows():
         raise ActivationAuthorizationError(
             "activation evidence digest is bound to different durable owner observations"
         )
@@ -833,14 +834,6 @@ class AuthorizedPostgresActivationRegistry:
             expected_generation_id=first.generation.generation_id,
             evidence_bundle_sha256=evidence.bundle_sha256(),
             evidence_writer=self._evidence_writer(evidence),
-        )
-        evidence.validate_for(
-            deployment_id=deployment.deployment_id,
-            environment_id=deployment.environment_id,
-            generation=second.generation,
-            authorization_action="recover",
-            authorized_state_sequence=second.event.activation_sequence,
-            now_unix_ms=self.clock_unix_ms(),
         )
         return AuthorizedRecoveredActivation(
             event=second.event,
