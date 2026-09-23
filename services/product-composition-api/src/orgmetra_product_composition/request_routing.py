@@ -41,18 +41,20 @@ class CompositionMethodNotAllowedError(CompositionRoutingError):
     """Raised with current methods when one selected Path Item rejects the request method."""
 
     def __init__(self, message: str, *, allowed_methods: tuple[object, ...]) -> None:
-        """Freeze one canonical Allow authority, including a valid temporarily empty authority."""
+        """Freeze one canonical Allow authority, including implicit HEAD parity for GET."""
 
         if type(allowed_methods) is not tuple:
             raise CompositionRoutingError("method rejection requires tuple Allow authority")
-        canonical_methods = tuple(
-            sorted({_canonical_request_method(method) for method in allowed_methods})
-        )
-        if any(method not in _ALLOWED_METHODS for method in canonical_methods):
+        canonical_method_set = {
+            _canonical_request_method(method) for method in allowed_methods
+        }
+        if any(method not in _ALLOWED_METHODS for method in canonical_method_set):
             raise CompositionRoutingError(
                 "method rejection Allow authority must use implemented composition methods"
             )
-        self.allowed_methods = canonical_methods
+        if "GET" in canonical_method_set:
+            canonical_method_set.add("HEAD")
+        self.allowed_methods = tuple(sorted(canonical_method_set))
         super().__init__(message)
 
 
