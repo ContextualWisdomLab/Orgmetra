@@ -83,6 +83,7 @@ def _recovery_evidence(
     action: str = "recover",
     state_sequence: int = 1,
     include_optional: bool = False,
+    config_sha256: str | None = None,
 ) -> ActivationAdmissionEvidence:
     required_route, optional_route = generation.routes
     required_owner = required_route.owner_release
@@ -121,7 +122,7 @@ def _recovery_evidence(
         deployment_id="orgmetra_gateway",
         environment_id="production",
         generation_id=generation.generation_id,
-        config_sha256=generation.config_sha256,
+        config_sha256=(generation.config_sha256 if config_sha256 is None else config_sha256),
         authorization_action=cast(object, action),
         authorized_state_sequence=state_sequence,
         keyverse_authority=_authority("keyverse", "5"),
@@ -314,6 +315,16 @@ def test_route_snapshot_rejects_evidence_generation_retarget(monkeypatch) -> Non
     other_generation = _generation("generation_other")
     other_evidence = _recovery_evidence(other_generation)
     object.__setattr__(snapshot, "_evidence", other_evidence)
+
+    with pytest.raises(ActivationAuthorizationError, match="evidence and generation must agree"):
+        _ = snapshot.available_route_ids
+
+
+def test_route_snapshot_rejects_evidence_config_retarget(monkeypatch) -> None:
+    generation = _generation()
+    snapshot = _issue_snapshot(monkeypatch, generation=generation)
+    wrong_config = _recovery_evidence(generation, config_sha256="f" * 64)
+    object.__setattr__(snapshot, "_evidence", wrong_config)
 
     with pytest.raises(ActivationAuthorizationError, match="evidence and generation must agree"):
         _ = snapshot.available_route_ids
