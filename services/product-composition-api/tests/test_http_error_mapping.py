@@ -25,14 +25,14 @@ def _decoded_problem(error: Exception):
 @pytest.mark.parametrize(
     ("error", "status", "code", "title"),
     [
-        (CompositionTransportError("raw transport detail"), 400, "invalid_request", "Invalid request"),
-        (CompositionRequestError("decoded request detail"), 400, "invalid_request", "Invalid request"),
-        (CompositionRouteNotFoundError("route detail"), 404, "route_not_found", "Route not found"),
-        (CompositionRouteUnavailableError("authority detail"), 503, "route_unavailable", "Route unavailable"),
-        (CompositionRoutingError("internal routing detail"), 500, "routing_error", "Routing failure"),
+        (CompositionTransportError("raw transport detail"), 400, "invalid_request", "Bad Request"),
+        (CompositionRequestError("decoded request detail"), 400, "invalid_request", "Bad Request"),
+        (CompositionRouteNotFoundError("route detail"), 404, "route_not_found", "Not Found"),
+        (CompositionRouteUnavailableError("authority detail"), 503, "route_unavailable", "Service Unavailable"),
+        (CompositionRoutingError("internal routing detail"), 500, "routing_error", "Internal Server Error"),
     ],
 )
-def test_composition_errors_map_to_stable_non_disclosing_problem_details(
+def test_about_blank_problem_titles_follow_http_status_phrases_without_disclosure(
     error: Exception,
     status: int,
     code: str,
@@ -73,7 +73,7 @@ def test_method_not_allowed_carries_canonical_allow_authority() -> None:
     assert payload == {
         "code": "method_not_allowed",
         "status": 405,
-        "title": "Method not allowed",
+        "title": "Method Not Allowed",
         "type": "about:blank",
     }
 
@@ -116,7 +116,7 @@ def test_send_composition_error_response_emits_one_complete_asgi_response() -> N
         },
         {
             "type": "http.response.body",
-            "body": b'{"code":"route_not_found","status":404,"title":"Route not found","type":"about:blank"}',
+            "body": b'{"code":"route_not_found","status":404,"title":"Not Found","type":"about:blank"}',
             "more_body": False,
         },
     ]
