@@ -34,7 +34,6 @@ from .registry import (
     RouteMethodRecord,
     RouteRecord,
 )
-from .route_availability import available_route_ids_for
 
 __all__ = [
     "ActivationAdmissionEvidence",
@@ -62,6 +61,5 @@ __all__ = [
     "RouteMethodRecord",
     "RouteRecord",
     "admit_generation",
-    "available_route_ids_for",
     "configuration_sha256",
 ]
