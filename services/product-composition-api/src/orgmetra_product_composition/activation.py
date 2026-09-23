@@ -226,19 +226,24 @@ class ActivationEvent:
 
 @dataclass(frozen=True, slots=True)
 class RecoveredActivation:
-    """Active event plus the freshly reconstructed immutable generation it selects."""
+    """Active event plus the freshly reconstructed generation and optional attestation sequence."""
 
     event: ActivationEvent
     generation: CompositionGeneration
+    recovery_sequence: int | None = None
 
     def __post_init__(self) -> None:
-        """Require exact event/generation types and matching durable generation identity."""
+        """Require exact event/generation types and a valid durable recovery sequence when present."""
         if type(self.event) is not ActivationEvent:
             raise ActivationRegistryError("recovery requires exact ActivationEvent")
         if type(self.generation) is not CompositionGeneration:
             raise ActivationRegistryError("recovery requires exact CompositionGeneration")
         if self.event.generation_id != self.generation.generation_id:
             raise ActivationRegistryError("recovered event and generation must agree")
+        if self.recovery_sequence is not None and (
+            type(self.recovery_sequence) is not int or self.recovery_sequence <= 0
+        ):
+            raise ActivationRegistryError("recovery_sequence must be an integer > 0 when present")
 
 
 @dataclass(frozen=True, slots=True)
@@ -415,7 +420,11 @@ class PostgresActivationRegistry:
                     raise ActivationRegistryError(
                         "recovery attestation insert did not return expected durable sequence"
                     )
-                return RecoveredActivation(event=current, generation=generation)
+                return RecoveredActivation(
+                    event=current,
+                    generation=generation,
+                    recovery_sequence=next_recovery_sequence,
+                )
 
     def _transition(
         self,
