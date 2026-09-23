@@ -1,10 +1,12 @@
-"""Project serviceable composition routes from current activation evidence.
+"""Project whole-route coverage from one validated activation-evidence value.
 
-Declared generation routes describe intended composition. This projection is deliberately
-narrower: it first reuses the complete activation-evidence validation boundary, then exposes
-only required routes and optional routes whose full owner-operation evidence is present.
-A serving adapter can therefore avoid treating a declared-but-unobserved optional route as
-callable while still preserving the immutable generation unchanged.
+Declared generation routes describe intended composition. This internal helper is narrower: it
+reuses the complete activation-evidence validation boundary, then reports required routes and
+optional routes whose full owner-operation evidence is present. It does not read PostgreSQL and
+therefore does not prove that the supplied generation/evidence still represents the deployment's
+current active state. A serving adapter must bind dispatch to a current durable activation snapshot
+before using this projection; until that state-bound adapter exists, this helper is not part of the
+package product public API.
 """
 
 from __future__ import annotations
@@ -27,12 +29,7 @@ def available_route_ids_for(
     authorized_state_sequence: int,
     now_unix_ms: int,
 ) -> tuple[str, ...]:
-    """Return route IDs currently covered by valid whole-route activation evidence.
-
-    This is a read-side serving projection, not a transition result. Validation failure means
-    the caller must not use the projection for dispatch; it does not reinterpret an activation
-    or recovery transaction that may already have committed.
-    """
+    """Return whole-route coverage for one evidence value, not current dispatch authority."""
 
     if type(evidence) is not ActivationAdmissionEvidence:
         raise ActivationAuthorizationError(
