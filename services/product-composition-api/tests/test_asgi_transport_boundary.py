@@ -133,15 +133,26 @@ def test_non_ascii_raw_path_is_outside_the_narrow_transport_profile() -> None:
 
 
 @pytest.mark.parametrize(
+    "method",
+    ["get", "M-SEARCH", "THIS-METHOD-NAME-IS-LONGER"],
+)
+def test_transport_preserves_valid_http_method_tokens_for_capability_classification(
+    method: str,
+) -> None:
+    request = canonical_request_from_asgi_scope(_scope(method=method))
+
+    assert request.method == method
+
+
+@pytest.mark.parametrize(
     ("overrides", "expected_error"),
     [
-        ({"method": "get"}, CompositionRequestError),
         ({"method": object()}, CompositionRequestError),
         ({"path": "/v1/people/../admin", "raw_path": b"/v1/people/../admin"}, CompositionRequestError),
         ({"path": object(), "raw_path": b"/v1/people/person_123"}, CompositionRequestError),
     ],
 )
-def test_router_still_owns_canonical_method_and_path_validation(
+def test_transport_rejects_malformed_method_or_path_before_request_routing(
     overrides: dict[str, object],
     expected_error: type[Exception],
 ) -> None:
@@ -183,6 +194,33 @@ def test_asgi_route_adapter_normalizes_before_calling_request_router(monkeypatch
             "/v1/people/person_123",
         )
     ]
+
+
+def test_asgi_route_adapter_delegates_valid_extension_method_to_capability_boundary(
+    monkeypatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_router(
+        registry: object,
+        deployment: object,
+        snapshot: object,
+        *,
+        method: str,
+        request_path: str,
+    ) -> str:
+        calls.append(method)
+        return "people_record"
+
+    monkeypatch.setattr(asgi_transport, "current_route_id_for_request", fake_router)
+
+    assert current_route_id_for_asgi_scope(
+        object(),
+        object(),
+        object(),
+        _scope(method="M-SEARCH"),
+    ) == "people_record"
+    assert calls == ["M-SEARCH"]
 
 
 def test_invalid_transport_never_calls_request_router(monkeypatch) -> None:
