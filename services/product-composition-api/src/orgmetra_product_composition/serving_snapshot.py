@@ -15,7 +15,7 @@ from threading import RLock
 from typing import cast
 from weakref import WeakValueDictionary, finalize
 
-from .activation import ActivationEvent, DeploymentIdentity
+from .activation import ActivationEvent, ActivationRegistryError, DeploymentIdentity
 from .activation_authorization import (
     ActivationAdmissionEvidence,
     ActivationAuthorizationError,
@@ -88,6 +88,12 @@ def _project_route_snapshot(snapshot: RecoveredRouteSnapshot) -> tuple[object, .
     if type(event) is not ActivationEvent:
         raise ActivationAuthorizationError("route snapshot requires exact ActivationEvent")
     ActivationEvent.__post_init__(event)
+    try:
+        DeploymentIdentity.__post_init__(event.deployment)
+    except ActivationRegistryError as exc:
+        raise ActivationAuthorizationError(
+            "route snapshot DeploymentIdentity no longer matches its construction snapshot"
+        ) from exc
     if type(generation) is not CompositionGeneration:
         raise ActivationAuthorizationError("route snapshot requires exact CompositionGeneration")
     _revalidate_generation_snapshot(generation)
@@ -101,6 +107,13 @@ def _project_route_snapshot(snapshot: RecoveredRouteSnapshot) -> tuple[object, .
     ):
         raise ActivationAuthorizationError("route snapshot route ids must be an exact tuple of str")
 
+    if (
+        evidence.deployment_id != event.deployment.deployment_id
+        or evidence.environment_id != event.deployment.environment_id
+    ):
+        raise ActivationAuthorizationError(
+            "route snapshot event and evidence must agree on deployment identity"
+        )
     if event.generation_id != generation.generation_id:
         raise ActivationAuthorizationError("route snapshot event and generation must agree")
     if (
@@ -128,6 +141,9 @@ def _project_route_snapshot(snapshot: RecoveredRouteSnapshot) -> tuple[object, .
 
     return (
         id(event),
+        id(event.deployment),
+        event.deployment.deployment_id,
+        event.deployment.environment_id,
         event.activation_sequence,
         event.generation_id,
         event.previous_generation_id,
