@@ -10,6 +10,7 @@ from orgmetra_product_composition import (
     OwnerApiRelease,
     OwnerOperationObservation,
     ReleasedAuthorityEvidence,
+    available_route_ids_for,
     configuration_sha256,
 )
 
@@ -109,7 +110,8 @@ def _available_route_ids(
     *,
     now_unix_ms: int = 1_500,
 ) -> tuple[str, ...]:
-    return evidence.available_route_ids_for(
+    return available_route_ids_for(
+        evidence,
         deployment_id="orgmetra_gateway",
         environment_id="production",
         generation=generation,
