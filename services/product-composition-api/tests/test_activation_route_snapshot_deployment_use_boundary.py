@@ -124,7 +124,12 @@ def _issued_snapshot() -> tuple[DeploymentIdentity, object]:
         evidence_bundle_sha256="a" * 64,
     )
     snapshot = _issue_route_snapshot(
-        AuthorizedRecoveredActivation(event=event, generation=generation, evidence=evidence)
+        AuthorizedRecoveredActivation(
+            event=event,
+            generation=generation,
+            evidence=evidence,
+            recovery_sequence=1,
+        )
     )
     return deployment, snapshot
 
@@ -140,6 +145,9 @@ def test_serving_currentness_pins_validated_deployment_coordinates_across_connec
             event.previous_generation_id,
             event.event_kind,
             event.evidence_bundle_sha256,
+            snapshot.recovery_sequence,
+            snapshot.evidence.bundle_sha256(),
+            1_250,
             1_500,
         )
     )
@@ -165,4 +173,8 @@ def test_serving_currentness_pins_validated_deployment_coordinates_across_connec
         current_route_ids_for_snapshot(registry, deployment, snapshot)
 
     assert len(cursor.executions) == 1
-    assert cursor.executions[0][1] == original_coordinates
+    assert cursor.executions[0][1] == (
+        *original_coordinates,
+        snapshot.recovery_sequence,
+        snapshot.evidence.bundle_sha256(),
+    )
