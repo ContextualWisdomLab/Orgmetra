@@ -72,9 +72,9 @@ def recover_active_route_snapshot(
     durable attestation is never reclassified locally as a failure after commit.
     """
 
-    if not isinstance(registry, AuthorizedPostgresActivationRegistry):
+    if type(registry) is not AuthorizedPostgresActivationRegistry:
         raise ActivationAuthorizationError(
-            "route snapshot requires AuthorizedPostgresActivationRegistry"
+            "route snapshot requires exact AuthorizedPostgresActivationRegistry"
         )
     recovered = registry.recover_active(deployment)
     if recovered is None:
