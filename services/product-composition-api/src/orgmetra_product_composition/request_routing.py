@@ -44,8 +44,6 @@ class CompositionMethodNotAllowedError(CompositionRoutingError):
         canonical_methods = tuple(
             sorted({_canonical_request_method(method) for method in allowed_methods})
         )
-        if not canonical_methods:
-            raise CompositionRoutingError("method rejection requires declared Allow authority")
         self.allowed_methods = canonical_methods
         super().__init__(message)
 
