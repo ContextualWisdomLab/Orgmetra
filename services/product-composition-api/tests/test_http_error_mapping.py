@@ -7,6 +7,7 @@ import pytest
 
 from orgmetra_product_composition import (
     CompositionMethodNotAllowedError,
+    CompositionMethodNotImplementedError,
     CompositionRequestError,
     CompositionRouteNotFoundError,
     CompositionRouteUnavailableError,
@@ -27,6 +28,12 @@ def _decoded_problem(error: Exception):
     [
         (CompositionTransportError("raw transport detail"), 400, "invalid_request", "Bad Request"),
         (CompositionRequestError("decoded request detail"), 400, "invalid_request", "Bad Request"),
+        (
+            CompositionMethodNotImplementedError("capability detail"),
+            501,
+            "method_not_implemented",
+            "Not Implemented",
+        ),
         (CompositionRouteNotFoundError("route detail"), 404, "route_not_found", "Not Found"),
         (CompositionRouteUnavailableError("authority detail"), 503, "route_unavailable", "Service Unavailable"),
         (CompositionRoutingError("internal routing detail"), 500, "routing_error", "Internal Server Error"),
