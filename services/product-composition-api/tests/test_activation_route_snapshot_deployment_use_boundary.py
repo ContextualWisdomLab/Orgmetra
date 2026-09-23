@@ -147,6 +147,7 @@ def test_serving_currentness_pins_validated_deployment_coordinates_across_connec
             event.evidence_bundle_sha256,
             snapshot.recovery_sequence,
             snapshot.evidence.bundle_sha256(),
+            snapshot.recovery_sequence,
             1_250,
             1_500,
             False,
