@@ -13,7 +13,7 @@ import re
 
 from .activation import DeploymentIdentity
 from .activation_runtime_integrity import AuthorizedPostgresActivationRegistry
-from .admission import CompositionGeneration, CompositionRoute
+from .admission import CompositionGeneration, CompositionRoute, _ALLOWED_METHODS
 from .serving_snapshot import RecoveredRouteSnapshot, current_route_ids_for_snapshot
 
 _REQUEST_METHOD = re.compile(r"^[A-Z]{1,16}$")
@@ -31,6 +31,10 @@ class CompositionRequestError(CompositionRoutingError):
 
 class CompositionRouteNotFoundError(CompositionRoutingError):
     """Raised when the active generation declares no Path Item for the request path."""
+
+
+class CompositionMethodNotImplementedError(CompositionRoutingError):
+    """Raised when a canonical method is outside the composition server's implemented profile."""
 
 
 class CompositionMethodNotAllowedError(CompositionRoutingError):
@@ -117,17 +121,23 @@ def current_route_id_for_request(
 ) -> str:
     """Return the current stable route ID for one canonical request or fail closed.
 
-    Request syntax and declared path/method authority are resolved before PostgreSQL use. Only a
-    request that selects one admitted route crosses ``current_route_ids_for_snapshot`` for durable
+    Request syntax and server method capability are resolved before declared path/method authority
+    or PostgreSQL use. Only a request using the fixed composition method profile can select one
+    admitted Path Item. A selected route then crosses ``current_route_ids_for_snapshot`` for durable
     activation/recovery currentness. Selection runs over the complete declared generation first,
     applies concrete-before-template precedence, chooses only an explicitly declared method, and
-    checks positive route availability last. This ordering prevents both unnecessary durable-state
-    reads for unroutable requests and an unavailable optional concrete Path Item from widening into
-    a template route.
+    checks positive route availability last. This ordering prevents unnecessary durable-state reads,
+    preserves the HTTP distinction between unimplemented methods and resource-specific rejection,
+    and prevents an unavailable optional concrete Path Item from widening into a template route.
     """
 
     canonical_method = _canonical_request_method(method)
     canonical_path = _canonical_request_path(request_path)
+    if canonical_method not in _ALLOWED_METHODS:
+        raise CompositionMethodNotImplementedError(
+            "request method is outside the implemented composition HTTP profile"
+        )
+
     generation = snapshot.generation
     path_routes = _selected_path_routes(generation, canonical_path)
     method_routes = tuple(
