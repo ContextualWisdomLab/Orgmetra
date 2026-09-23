@@ -13,6 +13,7 @@ from .request_routing import (
     CompositionRouteNotFoundError,
     CompositionRouteUnavailableError,
     CompositionRoutingError,
+    _require_method_rejection_authority,
 )
 
 AsgiSend = Callable[[dict[str, object]], Awaitable[None]]
@@ -59,18 +60,10 @@ def _problem_response(
 
 
 def _allow_header_value(error: CompositionMethodNotAllowedError) -> bytes:
-    """Revalidate mutable exception state before it becomes HTTP header authority."""
+    """Serialize only the construction-time 405 authority issued with this error."""
 
-    current_methods = error.allowed_methods
-    validated = CompositionMethodNotAllowedError(
-        "revalidate method rejection Allow authority",
-        allowed_methods=current_methods,
-    )
-    if validated.allowed_methods != current_methods:
-        raise CompositionRoutingError(
-            "method rejection Allow authority no longer matches its canonical form"
-        )
-    return ", ".join(validated.allowed_methods).encode("ascii")
+    issued_methods = _require_method_rejection_authority(error)
+    return ", ".join(issued_methods).encode("ascii")
 
 
 def http_response_for_composition_error(error: Exception) -> CompositionHttpResponse:
