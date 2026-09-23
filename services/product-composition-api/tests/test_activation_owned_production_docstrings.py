@@ -9,6 +9,7 @@ _OWNED_PRODUCTION_MODULES = (
     "activation_authorization.py",
     "activation_runtime_integrity.py",
     "route_availability.py",
+    "serving_snapshot.py",
 )
 
 
