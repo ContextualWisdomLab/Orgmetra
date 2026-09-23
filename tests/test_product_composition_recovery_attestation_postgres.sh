@@ -152,14 +152,16 @@ INSERT INTO product_composition_recovery_attestation (
     recovery_sequence,
     activation_sequence,
     generation_id,
-    evidence_bundle_sha256
+    evidence_bundle_sha256,
+    recovered_at
 ) VALUES (
     'orgmetra_gateway',
     'production',
     1,
     1,
     'generation_one',
-    repeat('8', 64)
+    repeat('8', 64),
+    TIMESTAMPTZ '2000-01-01 00:00:00+00'
 );
 SQL
 
@@ -171,10 +173,11 @@ WHERE deployment_id = 'orgmetra_gateway'
   AND recovery_sequence = 1
   AND activation_sequence = 1
   AND generation_id = 'generation_one'
-  AND evidence_bundle_sha256 = repeat('8', 64);
+  AND evidence_bundle_sha256 = repeat('8', 64)
+  AND recovered_at >= clock_timestamp() - INTERVAL '1 minute';
 ")"
 if [[ "${positive_count}" != "1" ]]; then
-    echo "fresh recovery evidence was not durably attested" >&2
+    echo "fresh recovery evidence was not durably attested with database-owned recovery time" >&2
     exit 1
 fi
 
