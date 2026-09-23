@@ -64,32 +64,32 @@ def http_response_for_composition_error(error: Exception) -> CompositionHttpResp
         return _problem_response(
             status=405,
             code="method_not_allowed",
-            title="Method not allowed",
+            title="Method Not Allowed",
             extra_headers=((b"allow", ", ".join(error.allowed_methods).encode("ascii")),),
         )
     if isinstance(error, CompositionRequestError):
         return _problem_response(
             status=400,
             code="invalid_request",
-            title="Invalid request",
+            title="Bad Request",
         )
     if isinstance(error, CompositionRouteNotFoundError):
         return _problem_response(
             status=404,
             code="route_not_found",
-            title="Route not found",
+            title="Not Found",
         )
     if isinstance(error, CompositionRouteUnavailableError):
         return _problem_response(
             status=503,
             code="route_unavailable",
-            title="Route unavailable",
+            title="Service Unavailable",
         )
     if isinstance(error, CompositionRoutingError):
         return _problem_response(
             status=500,
             code="routing_error",
-            title="Routing failure",
+            title="Internal Server Error",
         )
     raise TypeError("error must be a product-composition routing failure")
 
