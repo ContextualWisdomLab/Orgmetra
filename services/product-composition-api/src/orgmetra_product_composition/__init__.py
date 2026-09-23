@@ -47,6 +47,7 @@ from .registry import (
 )
 from .request_routing import (
     CompositionMethodNotAllowedError,
+    CompositionMethodNotImplementedError,
     CompositionRequestError,
     CompositionRouteNotFoundError,
     CompositionRouteUnavailableError,
@@ -75,6 +76,7 @@ __all__ = [
     "CompositionGeneration",
     "CompositionHttpResponse",
     "CompositionMethodNotAllowedError",
+    "CompositionMethodNotImplementedError",
     "CompositionRegistryError",
     "CompositionRequestError",
     "CompositionRoute",
