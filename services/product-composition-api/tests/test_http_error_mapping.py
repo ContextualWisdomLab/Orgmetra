@@ -117,6 +117,27 @@ def test_method_not_allowed_rejects_noncanonical_allow_authority(
         )
 
 
+@pytest.mark.parametrize(
+    "mutated_methods",
+    [
+        ("GET",),
+        ("TRACE",),
+        ("GET\r\nx-injected: true",),
+    ],
+)
+def test_http_mapping_revalidates_mutated_allow_authority(
+    mutated_methods: tuple[str, ...],
+) -> None:
+    error = CompositionMethodNotAllowedError(
+        "method detail",
+        allowed_methods=("GET",),
+    )
+    error.allowed_methods = mutated_methods
+
+    with pytest.raises(CompositionRoutingError):
+        http_response_for_composition_error(error)
+
+
 def test_send_composition_error_response_emits_one_complete_asgi_response() -> None:
     messages: list[dict[str, object]] = []
 
