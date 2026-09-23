@@ -68,9 +68,11 @@ $relation_owner_provenance$;
 
 -- Admission and durable generation authority preserve required=False routes as
 -- optional. Activation and recovery therefore require every operation for a
--- required route, allow a wholly unobserved optional route, and fail closed
--- when any optional route is only partially observed. Replacing the existing
--- trigger functions keeps their trusted public identities and 0024 bindings.
+-- required route, allow a wholly unobserved optional route, fail closed when
+-- any optional route is only partially observed, and never let bundle validity
+-- outlive an owner-operation observation that makes the route serviceable.
+-- Replacing the existing trigger functions keeps their trusted public identities
+-- and 0024 bindings.
 CREATE OR REPLACE FUNCTION public.validate_product_composition_activation_insert()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -185,6 +187,8 @@ BEGIN
                     AND observation.release_version = owner_release.release_version
                     AND observation.openapi_sha256 = owner_release.openapi_sha256
                     AND observation.artifact_sha256 = owner_release.artifact_sha256
+                    AND observation.observed_at_unix_ms <= wall_clock_unix_ms
+                    AND evidence_valid_until_unix_ms <= observation.valid_until_unix_ms
                     AND wall_clock_unix_ms < observation.valid_until_unix_ms
               )
         ) THEN
@@ -298,6 +302,7 @@ BEGIN
                 AND observation.openapi_sha256 = owner_release.openapi_sha256
                 AND observation.artifact_sha256 = owner_release.artifact_sha256
                 AND observation.observed_at_unix_ms <= wall_clock_unix_ms
+                AND evidence_valid_until_unix_ms <= observation.valid_until_unix_ms
                 AND wall_clock_unix_ms < observation.valid_until_unix_ms
           )
     ) THEN
