@@ -126,7 +126,7 @@ def test_method_not_allowed_rejects_noncanonical_allow_authority(
         ("GET\r\nx-injected: true",),
     ],
 )
-def test_http_mapping_revalidates_mutated_allow_authority(
+def test_http_mapping_rejects_any_mutated_allow_authority(
     mutated_methods: tuple[str, ...],
 ) -> None:
     error = CompositionMethodNotAllowedError(
@@ -134,6 +134,26 @@ def test_http_mapping_revalidates_mutated_allow_authority(
         allowed_methods=("GET",),
     )
     error.allowed_methods = mutated_methods
+
+    with pytest.raises(CompositionRoutingError):
+        http_response_for_composition_error(error)
+
+
+def test_http_mapping_rejects_deleted_allow_authority() -> None:
+    error = CompositionMethodNotAllowedError(
+        "method detail",
+        allowed_methods=("POST",),
+    )
+    del error.allowed_methods
+
+    with pytest.raises(CompositionRoutingError):
+        http_response_for_composition_error(error)
+
+
+def test_http_mapping_rejects_unissued_method_error_instance() -> None:
+    error = CompositionMethodNotAllowedError.__new__(CompositionMethodNotAllowedError)
+    RuntimeError.__init__(error, "forged method rejection")
+    error.allowed_methods = ("POST",)
 
     with pytest.raises(CompositionRoutingError):
         http_response_for_composition_error(error)
