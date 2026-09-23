@@ -125,7 +125,12 @@ def _snapshot():
         evidence_bundle_sha256="a" * 64,
     )
     snapshot = _issue_route_snapshot(
-        AuthorizedRecoveredActivation(event=event, generation=generation, evidence=evidence)
+        AuthorizedRecoveredActivation(
+            event=event,
+            generation=generation,
+            evidence=evidence,
+            recovery_sequence=1,
+        )
     )
     return deployment, snapshot
 
@@ -138,6 +143,7 @@ def _current_row(snapshot, *, recovered_at_unix_ms=1_250, now_unix_ms=1_500):
         event.previous_generation_id,
         event.event_kind,
         event.evidence_bundle_sha256,
+        snapshot.recovery_sequence,
         snapshot.evidence.bundle_sha256(),
         recovered_at_unix_ms,
         now_unix_ms,
@@ -165,7 +171,7 @@ def _registry(row):
     return registry, cursor
 
 
-def test_current_route_ids_require_the_snapshot_recovery_attestation_to_still_exist() -> None:
+def test_current_route_ids_require_the_exact_snapshot_recovery_attestation_to_still_exist() -> None:
     deployment, snapshot = _snapshot()
     registry, cursor = _registry(_current_row(snapshot))
 
@@ -173,9 +179,11 @@ def test_current_route_ids_require_the_snapshot_recovery_attestation_to_still_ex
     assert len(cursor.executions) == 1
     sql, parameters = cursor.executions[0]
     assert "public.product_composition_recovery_attestation" in sql
+    assert "recovery_attestation.recovery_sequence = %s" in sql
     assert parameters == (
         deployment.deployment_id,
         deployment.environment_id,
+        snapshot.recovery_sequence,
         snapshot.evidence.bundle_sha256(),
     )
 
@@ -185,6 +193,17 @@ def test_current_route_ids_reject_database_restore_that_lost_the_recovery_attest
     row = list(_current_row(snapshot))
     row[5] = None
     row[6] = None
+    row[7] = None
+    registry, _ = _registry(tuple(row))
+
+    with pytest.raises(ActivationConflictError, match="recovery attestation"):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
+
+
+def test_current_route_ids_reject_same_digest_from_another_recovery_sequence() -> None:
+    deployment, snapshot = _snapshot()
+    row = list(_current_row(snapshot))
+    row[5] = snapshot.recovery_sequence + 1
     registry, _ = _registry(tuple(row))
 
     with pytest.raises(ActivationConflictError, match="recovery attestation"):
