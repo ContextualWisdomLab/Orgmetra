@@ -9,7 +9,7 @@ from orgmetra_product_composition import (
 )
 
 
-@pytest.mark.parametrize("method", ["M-SEARCH", "X1", "get", "A_B"])
+@pytest.mark.parametrize("method", ["M-SEARCH", "X1", "get", "A_B", "THIS-METHOD-NAME-IS-LONGER"])
 def test_valid_http_tokens_outside_server_profile_fail_as_not_implemented_before_state_use(
     method: str,
 ) -> None:
