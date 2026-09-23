@@ -85,9 +85,27 @@ def test_method_not_allowed_carries_canonical_allow_authority() -> None:
     }
 
 
+def test_method_not_allowed_carries_empty_allow_for_temporarily_disabled_resource() -> None:
+    error = CompositionMethodNotAllowedError(
+        "method detail",
+        allowed_methods=(),
+    )
+
+    response, payload = _decoded_problem(error)
+
+    assert error.allowed_methods == ()
+    assert response.status == 405
+    assert response.headers == (
+        (b"content-type", b"application/problem+json"),
+        (b"cache-control", b"no-store"),
+        (b"allow", b""),
+    )
+    assert payload["code"] == "method_not_allowed"
+
+
 @pytest.mark.parametrize(
     "allowed_methods",
-    [(), ("get",), ("GET\nPOST",), ("GET", object())],
+    [("get",), ("GET\nPOST",), ("GET", object())],
 )
 def test_method_not_allowed_rejects_noncanonical_allow_authority(
     allowed_methods: tuple[object, ...],
