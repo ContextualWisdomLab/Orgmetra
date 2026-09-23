@@ -115,6 +115,21 @@ def _selected_path_routes(
     raise CompositionRouteNotFoundError("active generation declares no route for request path")
 
 
+def _route_supports_request_method(route: CompositionRoute, method: str) -> bool:
+    """Treat HEAD as the metadata-only counterpart of a declared GET route."""
+
+    return method in route.methods or (method == "HEAD" and "GET" in route.methods)
+
+
+def _advertised_route_methods(route: CompositionRoute) -> frozenset[str]:
+    """Return current HTTP methods exposed by one route, including implicit HEAD for GET."""
+
+    methods = set(route.methods)
+    if "GET" in methods:
+        methods.add("HEAD")
+    return frozenset(methods)
+
+
 def current_route_id_for_request(
     registry: AuthorizedPostgresActivationRegistry,
     deployment: DeploymentIdentity,
@@ -126,11 +141,11 @@ def current_route_id_for_request(
     """Return the current stable route ID for one canonical request or fail closed.
 
     Request syntax and server method capability are resolved before declared Path Item selection.
-    A selected path crosses ``current_route_ids_for_snapshot`` when needed either to advertise the
-    resource's current RFC 9110 ``Allow`` authority or to prove the requested route is serviceable.
-    Selection runs over the complete declared generation first and applies concrete-before-template
-    precedence before availability is considered. This preserves deterministic path authority while
-    preventing an unavailable optional concrete Path Item from widening into a template route.
+    HEAD shares GET route authority because RFC 9110 defines HEAD as GET without response content;
+    owner dispatch remains a later boundary. A selected path crosses ``current_route_ids_for_snapshot``
+    when needed either to advertise the resource's current RFC 9110 ``Allow`` authority or to prove
+    the requested route is serviceable. Selection runs over the complete declared generation first
+    and applies concrete-before-template precedence before availability is considered.
     """
 
     canonical_method = _canonical_request_method(method)
@@ -143,7 +158,7 @@ def current_route_id_for_request(
     generation = snapshot.generation
     path_routes = _selected_path_routes(generation, canonical_path)
     method_routes = tuple(
-        route for route in path_routes if canonical_method in route.methods
+        route for route in path_routes if _route_supports_request_method(route, canonical_method)
     )
     if not method_routes:
         available_route_ids = frozenset(
@@ -155,7 +170,7 @@ def current_route_id_for_request(
                     method
                     for route in path_routes
                     if route.route_id in available_route_ids
-                    for method in route.methods
+                    for method in _advertised_route_methods(route)
                 }
             )
         )
