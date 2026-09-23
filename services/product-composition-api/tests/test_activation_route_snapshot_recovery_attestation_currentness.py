@@ -200,6 +200,15 @@ def test_current_route_ids_require_the_exact_snapshot_recovery_attestation_to_st
     )
 
 
+def test_current_route_ids_query_the_latest_recovery_sequence_before_serving() -> None:
+    deployment, snapshot = _snapshot()
+    registry, cursor = _registry(_current_row(snapshot))
+
+    assert current_route_ids_for_snapshot(registry, deployment, snapshot) == ("people_get",)
+    sql, _ = cursor.executions[0]
+    assert "MAX(latest_recovery.recovery_sequence) AS latest_recovery_sequence" in sql
+
+
 def test_current_route_ids_reject_database_restore_that_lost_the_recovery_attestation() -> None:
     deployment, snapshot = _snapshot()
     row = list(_current_row(snapshot))
