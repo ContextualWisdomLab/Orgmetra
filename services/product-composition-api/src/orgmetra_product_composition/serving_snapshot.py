@@ -188,9 +188,11 @@ def _project_route_snapshot(snapshot: RecoveredRouteSnapshot) -> tuple[object, .
 
     observed_route_ids = {observation.route_id for observation in evidence.owner_operations}
     expected_route_ids = tuple(
-        route.route_id
-        for route in generation.routes
-        if route.required or route.route_id in observed_route_ids
+        sorted(
+            route.route_id
+            for route in generation.routes
+            if route.required or route.route_id in observed_route_ids
+        )
     )
     if available_route_ids != expected_route_ids:
         raise ActivationAuthorizationError(
@@ -275,9 +277,11 @@ def _issue_route_snapshot(recovered: AuthorizedRecoveredActivation) -> Recovered
         observation.route_id for observation in recovered.evidence.owner_operations
     }
     available_route_ids = tuple(
-        route.route_id
-        for route in recovered.generation.routes
-        if route.required or route.route_id in observed_route_ids
+        sorted(
+            route.route_id
+            for route in recovered.generation.routes
+            if route.required or route.route_id in observed_route_ids
+        )
     )
     snapshot = cast(RecoveredRouteSnapshot, object.__new__(RecoveredRouteSnapshot))
     object.__setattr__(snapshot, "_event", recovered.event)
