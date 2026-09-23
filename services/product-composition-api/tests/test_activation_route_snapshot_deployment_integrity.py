@@ -92,6 +92,7 @@ def _issued_snapshot():
             event=event,
             generation=generation,
             evidence=evidence,
+            recovery_sequence=1,
         )
     )
 
