@@ -10,6 +10,8 @@ remain later serving responsibilities.
 from __future__ import annotations
 
 import re
+from threading import RLock
+from weakref import WeakKeyDictionary
 
 from .activation import DeploymentIdentity
 from .activation_runtime_integrity import AuthorizedPostgresActivationRegistry
@@ -40,8 +42,10 @@ class CompositionMethodNotImplementedError(CompositionRoutingError):
 class CompositionMethodNotAllowedError(CompositionRoutingError):
     """Raised with current methods when one selected Path Item rejects the request method."""
 
+    __slots__ = ("allowed_methods", "__weakref__")
+
     def __init__(self, message: str, *, allowed_methods: tuple[object, ...]) -> None:
-        """Freeze one canonical Allow authority, including implicit HEAD parity for GET."""
+        """Issue one canonical Allow authority, including implicit HEAD parity for GET."""
 
         if type(allowed_methods) is not tuple:
             raise CompositionRoutingError("method rejection requires tuple Allow authority")
@@ -56,10 +60,59 @@ class CompositionMethodNotAllowedError(CompositionRoutingError):
             canonical_method_set.add("HEAD")
         self.allowed_methods = tuple(sorted(canonical_method_set))
         super().__init__(message)
+        _record_method_rejection_authority(self)
 
 
 class CompositionRouteUnavailableError(CompositionRoutingError):
     """Raised when the selected declared route lacks current positive availability evidence."""
+
+
+def _build_method_rejection_authority_runtime():
+    """Keep construction-time 405 authority outside mutable exception attributes."""
+
+    issued: WeakKeyDictionary[CompositionMethodNotAllowedError, tuple[str, ...]] = (
+        WeakKeyDictionary()
+    )
+    state_lock = RLock()
+    missing = object()
+
+    def record(error: CompositionMethodNotAllowedError) -> None:
+        """Record the one canonical method set issued with an error instance."""
+
+        with state_lock:
+            if error in issued:
+                raise CompositionRoutingError(
+                    "method rejection authority was already issued for this error"
+                )
+            issued[error] = error.allowed_methods
+
+    def require(error: CompositionMethodNotAllowedError) -> tuple[str, ...]:
+        """Return issued authority only while public exception state still matches it."""
+
+        with state_lock:
+            canonical = issued.get(error, missing)
+            if canonical is missing:
+                raise CompositionRoutingError(
+                    "method rejection lacks construction-time Allow authority"
+                )
+            try:
+                current = error.allowed_methods
+            except AttributeError as exc:
+                raise CompositionRoutingError(
+                    "method rejection Allow authority is no longer available"
+                ) from exc
+            if current != canonical:
+                raise CompositionRoutingError(
+                    "method rejection Allow authority changed after construction"
+                )
+            return canonical
+
+    return record, require
+
+
+_record_method_rejection_authority, _require_method_rejection_authority = (
+    _build_method_rejection_authority_runtime()
+)
 
 
 def _canonical_request_method(method: object) -> str:
