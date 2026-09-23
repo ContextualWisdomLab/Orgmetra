@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from orgmetra_product_composition import (
@@ -195,6 +197,50 @@ def test_route_snapshot_projects_only_after_locked_recovery_recheck_without_post
     assert snapshot.available_route_ids == ("people_get",)
     assert locked_rechecks == 1
     assert clock_reads == 2
+
+
+def test_route_snapshot_returns_none_when_no_generation_is_active() -> None:
+    deployment = DeploymentIdentity("orgmetra_gateway", "production")
+
+    class NoActiveRegistry(AuthorizedPostgresActivationRegistry):
+        __slots__ = ()
+
+        def recover_active(self, deployment_arg):
+            assert deployment_arg == deployment
+            return None
+
+    registry = NoActiveRegistry(
+        connection_factory=lambda: None,
+        evidence_provider=lambda *args: cast(ActivationAdmissionEvidence, object()),
+        clock_unix_ms=lambda: 1_500,
+    )
+
+    assert recover_active_route_snapshot(registry, deployment) is None
+
+
+def test_route_snapshot_rejects_non_registry_and_noncanonical_recovery_result() -> None:
+    deployment = DeploymentIdentity("orgmetra_gateway", "production")
+
+    with pytest.raises(ActivationAuthorizationError, match="requires Authorized"):
+        recover_active_route_snapshot(
+            cast(AuthorizedPostgresActivationRegistry, object()),
+            deployment,
+        )
+
+    class InvalidRecoveryRegistry(AuthorizedPostgresActivationRegistry):
+        __slots__ = ()
+
+        def recover_active(self, deployment_arg):
+            assert deployment_arg == deployment
+            return object()
+
+    registry = InvalidRecoveryRegistry(
+        connection_factory=lambda: None,
+        evidence_provider=lambda *args: cast(ActivationAdmissionEvidence, object()),
+        clock_unix_ms=lambda: 1_500,
+    )
+    with pytest.raises(ActivationAuthorizationError, match="exact AuthorizedRecoveredActivation"):
+        recover_active_route_snapshot(registry, deployment)
 
 
 def test_route_snapshot_value_cannot_be_forged_through_public_constructor() -> None:
