@@ -220,9 +220,13 @@ def test_superseded_serving_snapshot_is_route_unavailable_for_any_currentness_co
     monkeypatch,
     method: str,
 ) -> None:
+    """Classify durable snapshot supersession as ordinary request-time unavailability."""
+
     registry, deployment, snapshot = _fixture()
 
     def current_routes(*_args):
+        """Simulate the typed #437 supersession signal at the currentness boundary."""
+
         raise ActivationConflictError("snapshot was superseded")
 
     monkeypatch.setattr(request_routing, "current_route_ids_for_snapshot", current_routes)
@@ -240,9 +244,13 @@ def test_superseded_serving_snapshot_is_route_unavailable_for_any_currentness_co
 
 
 def test_serving_integrity_failure_is_not_laundered_as_route_unavailable(monkeypatch) -> None:
+    """Keep currentness integrity failures distinct from ordinary route unavailability."""
+
     registry, deployment, snapshot = _fixture()
 
     def current_routes(*_args):
+        """Simulate a typed integrity failure that the request adapter must not reclassify."""
+
         raise ActivationAuthorizationError("serving authority integrity failed")
 
     monkeypatch.setattr(request_routing, "current_route_ids_for_snapshot", current_routes)
