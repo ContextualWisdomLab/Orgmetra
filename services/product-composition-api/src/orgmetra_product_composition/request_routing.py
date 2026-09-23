@@ -34,7 +34,20 @@ class CompositionRouteNotFoundError(CompositionRoutingError):
 
 
 class CompositionMethodNotAllowedError(CompositionRoutingError):
-    """Raised when the selected declared Path Item does not admit the request method."""
+    """Raised with the exact declared methods when one selected Path Item rejects the method."""
+
+    def __init__(self, message: str, *, allowed_methods: tuple[object, ...]) -> None:
+        """Freeze one canonical non-empty Allow authority for later HTTP mapping."""
+
+        if type(allowed_methods) is not tuple or not allowed_methods:
+            raise CompositionRoutingError("method rejection requires declared Allow authority")
+        canonical_methods = tuple(
+            sorted({_canonical_request_method(method) for method in allowed_methods})
+        )
+        if not canonical_methods:
+            raise CompositionRoutingError("method rejection requires declared Allow authority")
+        self.allowed_methods = canonical_methods
+        super().__init__(message)
 
 
 class CompositionRouteUnavailableError(CompositionRoutingError):
@@ -123,8 +136,12 @@ def current_route_id_for_request(
         route for route in path_routes if canonical_method in route.methods
     )
     if not method_routes:
+        allowed_methods = tuple(
+            sorted({method for route in path_routes for method in route.methods})
+        )
         raise CompositionMethodNotAllowedError(
-            "selected declared Path Item does not admit request method"
+            "selected declared Path Item does not admit request method",
+            allowed_methods=allowed_methods,
         )
     if len(method_routes) != 1:
         raise CompositionRoutingError(
