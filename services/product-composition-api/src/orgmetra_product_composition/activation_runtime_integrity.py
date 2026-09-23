@@ -329,4 +329,5 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
             event=second.event,
             generation=second.generation,
             evidence=evidence,
+            recovery_sequence=second.recovery_sequence,
         )
