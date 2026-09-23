@@ -6,8 +6,8 @@ internal evidence-only route projection: the returned generation and evidence we
 against the deployment's then-current durable activation state under the deployment row lock.
 
 A snapshot is not perpetual dispatch authority. A serving adapter must discard it when its
-activation sequence is superseded, when its exact durable recovery attestation disappears, or
-after the embedded evidence expires.
+activation sequence is superseded, when a newer recovery attestation supersedes its evidence,
+when its exact durable recovery attestation disappears, or after the embedded evidence expires.
 """
 
 from __future__ import annotations
@@ -60,6 +60,12 @@ SELECT
     current_activation.evidence_bundle_sha256,
     recovery_attestation.recovery_sequence,
     recovery_attestation.evidence_bundle_sha256 AS recovery_evidence_bundle_sha256,
+    (
+        SELECT MAX(latest_recovery.recovery_sequence)
+        FROM public.product_composition_recovery_attestation AS latest_recovery
+        WHERE latest_recovery.deployment_id = current_activation.deployment_id
+          AND latest_recovery.environment_id = current_activation.environment_id
+    ) AS latest_recovery_sequence,
     floor(extract(epoch FROM recovery_attestation.recovered_at) * 1000)::bigint AS recovered_at_unix_ms,
     floor(extract(epoch FROM serving_clock.observed_at) * 1000)::bigint AS observed_at_unix_ms,
     serving_clock.observed_at < recovery_attestation.recovered_at AS recovery_clock_rewound
@@ -329,13 +335,14 @@ def current_route_ids_for_snapshot(
     deployment: DeploymentIdentity,
     snapshot: RecoveredRouteSnapshot,
 ) -> tuple[str, ...]:
-    """Return routes only if snapshot state, exact attestation and freshness survive one DB read.
+    """Return routes only if snapshot state, latest attestation and freshness survive one DB read.
 
-    The database statement is the routing-decision linearization point. It rechecks both the
-    current activation and the exact recovery sequence that issued the snapshot, while using
-    PostgreSQL wall clock as freshness authority. A later activation may supersede this decision
-    after the read, so callers must invoke this at the request-routing boundary rather than
-    treating a successful result as a perpetual cache grant.
+    The database statement is the routing-decision linearization point. It rechecks the current
+    activation, the exact recovery sequence that issued the snapshot, and whether that sequence
+    remains the deployment's latest recovery attestation, while using PostgreSQL wall clock as
+    freshness authority. A later activation or recovery may supersede this decision after the
+    read, so callers must invoke this at the request-routing boundary rather than treating a
+    successful result as a perpetual cache grant.
     """
 
     if type(registry) is not AuthorizedPostgresActivationRegistry:
@@ -410,7 +417,7 @@ def current_route_ids_for_snapshot(
 
     if row is None:
         raise ActivationConflictError("route snapshot was superseded by missing durable activation state")
-    if type(row) is not tuple or len(row) != 10:
+    if type(row) is not tuple or len(row) != 11:
         raise ActivationAuthorizationError("serving state query returned invalid durable shape")
     (
         activation_sequence,
@@ -420,6 +427,7 @@ def current_route_ids_for_snapshot(
         evidence_bundle_sha256,
         durable_recovery_sequence,
         durable_recovery_evidence_sha256,
+        latest_recovery_sequence,
         recovered_at_unix_ms,
         observed_at_unix_ms,
         recovery_clock_rewound,
@@ -444,6 +452,8 @@ def current_route_ids_for_snapshot(
         raise ActivationAuthorizationError("serving state returned invalid recovery sequence")
     if type(durable_recovery_evidence_sha256) is not str:
         raise ActivationAuthorizationError("serving state returned invalid recovery evidence digest")
+    if type(latest_recovery_sequence) is not int or latest_recovery_sequence <= 0:
+        raise ActivationAuthorizationError("serving state returned invalid latest recovery sequence")
     if type(recovered_at_unix_ms) is not int or recovered_at_unix_ms <= 0:
         raise ActivationAuthorizationError("serving state returned invalid recovery timestamp")
     if type(observed_at_unix_ms) is not int or observed_at_unix_ms <= 0:
@@ -474,6 +484,10 @@ def current_route_ids_for_snapshot(
     if durable_recovery_evidence_sha256 != recovery_evidence_bundle_sha256:
         raise ActivationConflictError(
             "route snapshot durable recovery attestation no longer matches issued recovery evidence"
+        )
+    if latest_recovery_sequence != recovery_sequence:
+        raise ActivationConflictError(
+            "route snapshot was superseded by newer recovery attestation"
         )
     if recovery_clock_rewound or observed_at_unix_ms < recovered_at_unix_ms:
         raise ActivationAuthorizationError(
