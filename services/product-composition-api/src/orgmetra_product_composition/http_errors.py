@@ -58,6 +58,21 @@ def _problem_response(
     )
 
 
+def _allow_header_value(error: CompositionMethodNotAllowedError) -> bytes:
+    """Revalidate mutable exception state before it becomes HTTP header authority."""
+
+    current_methods = error.allowed_methods
+    validated = CompositionMethodNotAllowedError(
+        "revalidate method rejection Allow authority",
+        allowed_methods=current_methods,
+    )
+    if validated.allowed_methods != current_methods:
+        raise CompositionRoutingError(
+            "method rejection Allow authority no longer matches its canonical form"
+        )
+    return ", ".join(validated.allowed_methods).encode("ascii")
+
+
 def http_response_for_composition_error(error: Exception) -> CompositionHttpResponse:
     """Map one known composition failure to a stable HTTP response or reject foreign failures."""
 
@@ -66,7 +81,7 @@ def http_response_for_composition_error(error: Exception) -> CompositionHttpResp
             status=405,
             code="method_not_allowed",
             title="Method Not Allowed",
-            extra_headers=((b"allow", ", ".join(error.allowed_methods).encode("ascii")),),
+            extra_headers=((b"allow", _allow_header_value(error)),),
         )
     if isinstance(error, CompositionRequestError):
         return _problem_response(
