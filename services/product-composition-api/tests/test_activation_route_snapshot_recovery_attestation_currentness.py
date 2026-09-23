@@ -138,11 +138,14 @@ def _snapshot():
 def _current_row(
     snapshot,
     *,
+    latest_recovery_sequence=None,
     recovered_at_unix_ms=1_250,
     now_unix_ms=1_500,
     recovery_clock_rewound=False,
 ):
     event = snapshot.event
+    if latest_recovery_sequence is None:
+        latest_recovery_sequence = snapshot.recovery_sequence
     return (
         event.activation_sequence,
         event.generation_id,
@@ -151,6 +154,7 @@ def _current_row(
         event.evidence_bundle_sha256,
         snapshot.recovery_sequence,
         snapshot.evidence.bundle_sha256(),
+        latest_recovery_sequence,
         recovered_at_unix_ms,
         now_unix_ms,
         recovery_clock_rewound,
@@ -206,7 +210,21 @@ def test_current_route_ids_query_the_latest_recovery_sequence_before_serving() -
 
     assert current_route_ids_for_snapshot(registry, deployment, snapshot) == ("people_get",)
     sql, _ = cursor.executions[0]
-    assert "MAX(latest_recovery.recovery_sequence) AS latest_recovery_sequence" in sql
+    assert "MAX(latest_recovery.recovery_sequence)" in sql
+    assert "AS latest_recovery_sequence" in sql
+
+
+def test_current_route_ids_reject_snapshot_superseded_by_newer_recovery_attestation() -> None:
+    deployment, snapshot = _snapshot()
+    registry, _ = _registry(
+        _current_row(
+            snapshot,
+            latest_recovery_sequence=snapshot.recovery_sequence + 1,
+        )
+    )
+
+    with pytest.raises(ActivationConflictError, match="newer recovery attestation"):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
 
 
 def test_current_route_ids_reject_database_restore_that_lost_the_recovery_attestation() -> None:
@@ -215,7 +233,8 @@ def test_current_route_ids_reject_database_restore_that_lost_the_recovery_attest
     row[5] = None
     row[6] = None
     row[7] = None
-    row[9] = None
+    row[8] = None
+    row[10] = None
     registry, _ = _registry(tuple(row))
 
     with pytest.raises(ActivationConflictError, match="recovery attestation"):
@@ -260,7 +279,7 @@ def test_current_route_ids_reject_submillisecond_database_wall_clock_rewind() ->
 def test_current_route_ids_reject_non_boolean_recovery_clock_ordering() -> None:
     deployment, snapshot = _snapshot()
     row = list(_current_row(snapshot))
-    row[9] = 1
+    row[10] = 1
     registry, _ = _registry(tuple(row))
 
     with pytest.raises(ActivationAuthorizationError, match="clock ordering"):
