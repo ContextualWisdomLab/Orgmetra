@@ -34,6 +34,7 @@ from .registry import (
     RouteMethodRecord,
     RouteRecord,
 )
+from .serving_snapshot import RecoveredRouteSnapshot, recover_active_route_snapshot
 
 __all__ = [
     "ActivationAdmissionEvidence",
@@ -57,9 +58,11 @@ __all__ = [
     "OwnerReleaseRecord",
     "PostgresGenerationRegistry",
     "RecoveredActivation",
+    "RecoveredRouteSnapshot",
     "ReleasedAuthorityEvidence",
     "RouteMethodRecord",
     "RouteRecord",
     "admit_generation",
     "configuration_sha256",
+    "recover_active_route_snapshot",
 ]
