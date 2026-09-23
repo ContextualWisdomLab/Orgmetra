@@ -135,7 +135,13 @@ def _snapshot():
     return deployment, snapshot
 
 
-def _current_row(snapshot, *, recovered_at_unix_ms=1_250, now_unix_ms=1_500):
+def _current_row(
+    snapshot,
+    *,
+    recovered_at_unix_ms=1_250,
+    now_unix_ms=1_500,
+    recovery_clock_rewound=False,
+):
     event = snapshot.event
     return (
         event.activation_sequence,
@@ -147,6 +153,7 @@ def _current_row(snapshot, *, recovered_at_unix_ms=1_250, now_unix_ms=1_500):
         snapshot.evidence.bundle_sha256(),
         recovered_at_unix_ms,
         now_unix_ms,
+        recovery_clock_rewound,
     )
 
 
@@ -180,6 +187,11 @@ def test_current_route_ids_require_the_exact_snapshot_recovery_attestation_to_st
     sql, parameters = cursor.executions[0]
     assert "public.product_composition_recovery_attestation" in sql
     assert "recovery_attestation.recovery_sequence = %s" in sql
+    assert "serving_clock AS MATERIALIZED" in sql
+    assert (
+        "serving_clock.observed_at < recovery_attestation.recovered_at AS recovery_clock_rewound"
+        in sql
+    )
     assert parameters == (
         deployment.deployment_id,
         deployment.environment_id,
@@ -194,6 +206,7 @@ def test_current_route_ids_reject_database_restore_that_lost_the_recovery_attest
     row[5] = None
     row[6] = None
     row[7] = None
+    row[9] = None
     registry, _ = _registry(tuple(row))
 
     with pytest.raises(ActivationConflictError, match="recovery attestation"):
@@ -222,12 +235,14 @@ def test_current_route_ids_reject_database_wall_clock_rewind_before_recovery_com
 
 def test_current_route_ids_reject_submillisecond_database_wall_clock_rewind() -> None:
     deployment, snapshot = _snapshot()
-    row_with_exact_rewind = _current_row(
-        snapshot,
-        recovered_at_unix_ms=1_500,
-        now_unix_ms=1_500,
-    ) + (True,)
-    registry, _ = _registry(row_with_exact_rewind)
+    registry, _ = _registry(
+        _current_row(
+            snapshot,
+            recovered_at_unix_ms=1_500,
+            now_unix_ms=1_500,
+            recovery_clock_rewound=True,
+        )
+    )
 
     with pytest.raises(ActivationAuthorizationError, match="behind recovery attestation"):
         current_route_ids_for_snapshot(registry, deployment, snapshot)
