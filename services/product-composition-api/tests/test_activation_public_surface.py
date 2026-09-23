@@ -17,5 +17,7 @@ def test_unbound_route_availability_projection_is_not_a_product_public_entrypoin
 def test_recovery_bound_route_snapshot_is_the_supported_route_projection_surface() -> None:
     assert "RecoveredRouteSnapshot" in product_composition.__all__
     assert "recover_active_route_snapshot" in product_composition.__all__
+    assert "current_route_ids_for_snapshot" in product_composition.__all__
     assert hasattr(product_composition, "RecoveredRouteSnapshot")
     assert hasattr(product_composition, "recover_active_route_snapshot")
+    assert hasattr(product_composition, "current_route_ids_for_snapshot")
