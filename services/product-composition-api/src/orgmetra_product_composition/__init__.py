@@ -32,6 +32,11 @@ from .asgi_transport import (
     canonical_request_from_asgi_scope,
     current_route_id_for_asgi_scope,
 )
+from .http_errors import (
+    CompositionHttpResponse,
+    http_response_for_composition_error,
+    send_composition_error_response,
+)
 from .postgres_registry import PostgresGenerationRegistry
 from .registry import (
     CompositionRegistryError,
@@ -68,6 +73,7 @@ __all__ = [
     "CanonicalHttpRequest",
     "CompositionContractError",
     "CompositionGeneration",
+    "CompositionHttpResponse",
     "CompositionMethodNotAllowedError",
     "CompositionRegistryError",
     "CompositionRequestError",
@@ -93,5 +99,7 @@ __all__ = [
     "current_route_id_for_asgi_scope",
     "current_route_id_for_request",
     "current_route_ids_for_snapshot",
+    "http_response_for_composition_error",
     "recover_active_route_snapshot",
+    "send_composition_error_response",
 ]
