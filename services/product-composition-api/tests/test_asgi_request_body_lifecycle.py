@@ -34,7 +34,9 @@ def test_empty_request_body_accepts_asgi_defaults() -> None:
 
     receive = _ReceiveSequence(({"type": "http.request"},))
 
-    assert asyncio.run(read_bounded_http_request_body(receive, max_body_bytes=0)) == b""
+    assert asyncio.run(
+        read_bounded_http_request_body(receive, max_body_bytes=0, max_receive_events=1)
+    ) == b""
     assert receive.calls == 1
 
 
@@ -49,7 +51,9 @@ def test_chunked_request_body_is_detached_and_stops_after_terminal_chunk() -> No
         )
     )
 
-    assert asyncio.run(read_bounded_http_request_body(receive, max_body_bytes=6)) == b"abcdef"
+    assert asyncio.run(
+        read_bounded_http_request_body(receive, max_body_bytes=6, max_receive_events=2)
+    ) == b"abcdef"
     assert receive.calls == 2
 
 
@@ -63,7 +67,9 @@ def test_request_body_size_limit_accepts_exact_boundary() -> None:
         )
     )
 
-    assert asyncio.run(read_bounded_http_request_body(receive, max_body_bytes=4)) == b"abcd"
+    assert asyncio.run(
+        read_bounded_http_request_body(receive, max_body_bytes=4, max_receive_events=2)
+    ) == b"abcd"
 
 
 def test_request_body_size_limit_fails_before_waiting_for_more_chunks() -> None:
@@ -77,8 +83,44 @@ def test_request_body_size_limit_fails_before_waiting_for_more_chunks() -> None:
     )
 
     with pytest.raises(CompositionRequestBodyTooLargeError, match="exceeds"):
-        asyncio.run(read_bounded_http_request_body(receive, max_body_bytes=2))
+        asyncio.run(
+            read_bounded_http_request_body(receive, max_body_bytes=2, max_receive_events=2)
+        )
     assert receive.calls == 1
+
+
+def test_receive_event_limit_accepts_terminal_event_at_exact_boundary() -> None:
+    """Allow the terminal body event to consume the final configured receive-event slot."""
+
+    receive = _ReceiveSequence(
+        (
+            {"type": "http.request", "body": b"a", "more_body": True},
+            {"type": "http.request", "body": b"b", "more_body": False},
+        )
+    )
+
+    assert asyncio.run(
+        read_bounded_http_request_body(receive, max_body_bytes=2, max_receive_events=2)
+    ) == b"ab"
+    assert receive.calls == 2
+
+
+def test_receive_event_limit_fails_before_waiting_beyond_budget() -> None:
+    """Bound empty/tiny chunk CPU work and refuse another receive once the event budget is spent."""
+
+    receive = _ReceiveSequence(
+        (
+            {"type": "http.request", "body": b"", "more_body": True},
+            {"type": "http.request", "body": b"", "more_body": True},
+            {"type": "http.request", "body": b"never-consumed", "more_body": False},
+        )
+    )
+
+    with pytest.raises(CompositionRequestBodyError, match="event limit"):
+        asyncio.run(
+            read_bounded_http_request_body(receive, max_body_bytes=16, max_receive_events=2)
+        )
+    assert receive.calls == 2
 
 
 def test_client_disconnect_is_distinct_from_malformed_transport() -> None:
@@ -87,7 +129,9 @@ def test_client_disconnect_is_distinct_from_malformed_transport() -> None:
     receive = _ReceiveSequence(({"type": "http.disconnect"},))
 
     with pytest.raises(CompositionClientDisconnectedError, match="disconnected"):
-        asyncio.run(read_bounded_http_request_body(receive, max_body_bytes=16))
+        asyncio.run(
+            read_bounded_http_request_body(receive, max_body_bytes=16, max_receive_events=1)
+        )
 
 
 @pytest.mark.parametrize(
@@ -107,7 +151,9 @@ def test_malformed_receive_events_fail_closed(event: object) -> None:
     receive = _ReceiveSequence((event,))
 
     with pytest.raises(CompositionRequestBodyError):
-        asyncio.run(read_bounded_http_request_body(receive, max_body_bytes=16))
+        asyncio.run(
+            read_bounded_http_request_body(receive, max_body_bytes=16, max_receive_events=1)
+        )
 
 
 @pytest.mark.parametrize("max_body_bytes", (True, -1, 16 * 1024 * 1024 + 1))
@@ -121,6 +167,26 @@ def test_body_limit_configuration_is_bounded_and_exact(max_body_bytes: object) -
             read_bounded_http_request_body(
                 receive,
                 max_body_bytes=max_body_bytes,  # type: ignore[arg-type]
+                max_receive_events=1,
+            )
+        )
+    assert receive.calls == 0
+
+
+@pytest.mark.parametrize("max_receive_events", (True, 0, 4097))
+def test_receive_event_limit_configuration_is_bounded_and_exact(
+    max_receive_events: object,
+) -> None:
+    """Reject ambiguous or excessive receive-event budgets before request-body I/O."""
+
+    receive = _ReceiveSequence(({"type": "http.request"},))
+
+    with pytest.raises(CompositionRequestBodyError, match="max_receive_events"):
+        asyncio.run(
+            read_bounded_http_request_body(
+                receive,
+                max_body_bytes=16,
+                max_receive_events=max_receive_events,  # type: ignore[arg-type]
             )
         )
     assert receive.calls == 0
@@ -134,6 +200,7 @@ def test_receive_must_be_callable_before_any_io() -> None:
             read_bounded_http_request_body(
                 object(),  # type: ignore[arg-type]
                 max_body_bytes=16,
+                max_receive_events=1,
             )
         )
 
@@ -150,4 +217,10 @@ def test_receive_cancellation_propagates_without_timeout_reclassification() -> N
             raise asyncio.CancelledError
 
     with pytest.raises(asyncio.CancelledError):
-        asyncio.run(read_bounded_http_request_body(_CancelledReceive(), max_body_bytes=16))
+        asyncio.run(
+            read_bounded_http_request_body(
+                _CancelledReceive(),
+                max_body_bytes=16,
+                max_receive_events=1,
+            )
+        )
