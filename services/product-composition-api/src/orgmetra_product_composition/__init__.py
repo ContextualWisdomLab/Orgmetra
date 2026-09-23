@@ -26,6 +26,12 @@ from .admission import (
     admit_generation,
     configuration_sha256,
 )
+from .asgi_transport import (
+    CanonicalHttpRequest,
+    CompositionTransportError,
+    canonical_request_from_asgi_scope,
+    current_route_id_for_asgi_scope,
+)
 from .postgres_registry import PostgresGenerationRegistry
 from .registry import (
     CompositionRegistryError,
@@ -59,6 +65,7 @@ __all__ = [
     "AuthorizedActivation",
     "AuthorizedPostgresActivationRegistry",
     "AuthorizedRecoveredActivation",
+    "CanonicalHttpRequest",
     "CompositionContractError",
     "CompositionGeneration",
     "CompositionMethodNotAllowedError",
@@ -68,6 +75,7 @@ __all__ = [
     "CompositionRouteNotFoundError",
     "CompositionRouteUnavailableError",
     "CompositionRoutingError",
+    "CompositionTransportError",
     "DeploymentIdentity",
     "GenerationRecordSet",
     "OwnerApiRelease",
@@ -80,7 +88,9 @@ __all__ = [
     "RouteMethodRecord",
     "RouteRecord",
     "admit_generation",
+    "canonical_request_from_asgi_scope",
     "configuration_sha256",
+    "current_route_id_for_asgi_scope",
     "current_route_id_for_request",
     "current_route_ids_for_snapshot",
     "recover_active_route_snapshot",
