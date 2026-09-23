@@ -106,18 +106,17 @@ def current_route_id_for_request(
 ) -> str:
     """Return the current stable route ID for one canonical request or fail closed.
 
-    Request syntax is rejected before database use. Durable activation/recovery currentness is
-    then linearized by ``current_route_ids_for_snapshot``. Route selection runs over the complete
-    declared generation first, applies concrete-before-template precedence, chooses only an
-    explicitly declared method, and checks positive route availability last. This ordering
-    prevents an unavailable optional concrete Path Item from widening into a template route.
+    Request syntax and declared path/method authority are resolved before PostgreSQL use. Only a
+    request that selects one admitted route crosses ``current_route_ids_for_snapshot`` for durable
+    activation/recovery currentness. Selection runs over the complete declared generation first,
+    applies concrete-before-template precedence, chooses only an explicitly declared method, and
+    checks positive route availability last. This ordering prevents both unnecessary durable-state
+    reads for unroutable requests and an unavailable optional concrete Path Item from widening into
+    a template route.
     """
 
     canonical_method = _canonical_request_method(method)
     canonical_path = _canonical_request_path(request_path)
-    available_route_ids = frozenset(
-        current_route_ids_for_snapshot(registry, deployment, snapshot)
-    )
     generation = snapshot.generation
     path_routes = _selected_path_routes(generation, canonical_path)
     method_routes = tuple(
@@ -133,8 +132,12 @@ def current_route_id_for_request(
         )
 
     selected_route = method_routes[0]
-    if selected_route.route_id not in available_route_ids:
+    selected_route_id = selected_route.route_id
+    available_route_ids = frozenset(
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
+    )
+    if selected_route_id not in available_route_ids:
         raise CompositionRouteUnavailableError(
             "selected declared route lacks current positive availability evidence"
         )
-    return selected_route.route_id
+    return selected_route_id
