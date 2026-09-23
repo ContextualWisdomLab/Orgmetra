@@ -102,6 +102,7 @@ def test_send_composition_error_response_emits_one_complete_asgi_response() -> N
         send_composition_error_response(
             send,
             CompositionRouteNotFoundError("do not disclose this"),
+            request_method="GET",
         )
     )
 
@@ -117,6 +118,41 @@ def test_send_composition_error_response_emits_one_complete_asgi_response() -> N
         {
             "type": "http.response.body",
             "body": b'{"code":"route_not_found","status":404,"title":"Not Found","type":"about:blank"}',
+            "more_body": False,
+        },
+    ]
+
+
+def test_head_error_response_emits_metadata_without_response_content() -> None:
+    messages: list[dict[str, object]] = []
+
+    async def send(message: dict[str, object]) -> None:
+        messages.append(message)
+
+    error = CompositionRouteNotFoundError("do not disclose this")
+    mapped = http_response_for_composition_error(error)
+    assert mapped.body
+
+    asyncio.run(
+        send_composition_error_response(
+            send,
+            error,
+            request_method="HEAD",
+        )
+    )
+
+    assert messages == [
+        {
+            "type": "http.response.start",
+            "status": 404,
+            "headers": [
+                (b"content-type", b"application/problem+json"),
+                (b"cache-control", b"no-store"),
+            ],
+        },
+        {
+            "type": "http.response.body",
+            "body": b"",
             "more_body": False,
         },
     ]
