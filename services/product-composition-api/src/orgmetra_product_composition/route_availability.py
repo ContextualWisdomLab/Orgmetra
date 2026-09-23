@@ -2,11 +2,13 @@
 
 Declared generation routes describe intended composition. This internal helper is narrower: it
 reuses the complete activation-evidence validation boundary, then reports required routes and
-optional routes whose full owner-operation evidence is present. It does not read PostgreSQL and
-therefore does not prove that the supplied generation/evidence still represents the deployment's
-current active state. A serving adapter must bind dispatch to a current durable activation snapshot
-before using this projection; until that state-bound adapter exists, this helper is not part of the
-package product public API.
+optional routes whose full owner-operation evidence is present. The route-id projection is sorted
+lexically so semantically identical generations cannot produce different availability tuples only
+because their input route tuples use a different order. It does not read PostgreSQL and therefore
+does not prove that the supplied generation/evidence still represents the deployment's current
+active state. A serving adapter must bind dispatch to a current durable activation snapshot before
+using this projection; until that state-bound adapter exists, this helper is not part of the package
+product public API.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ def available_route_ids_for(
     authorized_state_sequence: int,
     now_unix_ms: int,
 ) -> tuple[str, ...]:
-    """Return whole-route coverage for one evidence value, not current dispatch authority."""
+    """Return canonical whole-route coverage, not current dispatch authority."""
 
     if type(evidence) is not ActivationAdmissionEvidence:
         raise ActivationAuthorizationError(
@@ -45,7 +47,9 @@ def available_route_ids_for(
     )
     observed_route_ids = {observation.route_id for observation in evidence.owner_operations}
     return tuple(
-        route.route_id
-        for route in generation.routes
-        if route.required or route.route_id in observed_route_ids
+        sorted(
+            route.route_id
+            for route in generation.routes
+            if route.required or route.route_id in observed_route_ids
+        )
     )
