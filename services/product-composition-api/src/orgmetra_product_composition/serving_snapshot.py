@@ -15,14 +15,37 @@ from threading import RLock
 from typing import cast
 from weakref import WeakValueDictionary, finalize
 
-from .activation import ActivationEvent, ActivationRegistryError, DeploymentIdentity
+from .activation import (
+    ActivationConflictError,
+    ActivationEvent,
+    ActivationRegistryError,
+    DeploymentIdentity,
+)
 from .activation_authorization import (
     ActivationAdmissionEvidence,
     ActivationAuthorizationError,
     AuthorizedRecoveredActivation,
 )
-from .activation_runtime_integrity import AuthorizedPostgresActivationRegistry
+from .activation_runtime_integrity import (
+    AuthorizedPostgresActivationRegistry,
+    _require_pinned_connection_factory,
+)
 from .admission import CompositionGeneration, _revalidate_generation_snapshot
+
+
+_SELECT_CURRENT_SERVING_STATE_SQL = """
+SELECT
+    activation_sequence,
+    generation_id,
+    previous_generation_id,
+    event_kind,
+    evidence_bundle_sha256,
+    floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS observed_at_unix_ms
+FROM public.product_composition_activation_event
+WHERE deployment_id = %s AND environment_id = %s
+ORDER BY activation_sequence DESC
+LIMIT 1
+""".strip()
 
 
 class RecoveredRouteSnapshot:
@@ -249,3 +272,110 @@ def recover_active_route_snapshot(
             "route snapshot recovery must return exact AuthorizedRecoveredActivation"
         )
     return _issue_route_snapshot(recovered)
+
+
+def current_route_ids_for_snapshot(
+    registry: AuthorizedPostgresActivationRegistry,
+    deployment: DeploymentIdentity,
+    snapshot: RecoveredRouteSnapshot,
+) -> tuple[str, ...]:
+    """Return routes only if the snapshot is current and fresh at one PostgreSQL read.
+
+    The database statement is the routing-decision linearization point. No recovery attestation
+    is written and no process-local clock is consulted. A later activation may supersede this
+    decision after the read, so callers must invoke this at the request-routing boundary rather
+    than treating a successful result as a perpetual cache grant.
+    """
+
+    if type(registry) is not AuthorizedPostgresActivationRegistry:
+        raise ActivationAuthorizationError(
+            "serving currentness requires exact AuthorizedPostgresActivationRegistry"
+        )
+    if type(deployment) is not DeploymentIdentity:
+        raise ActivationAuthorizationError("serving currentness requires exact DeploymentIdentity")
+    try:
+        DeploymentIdentity.__post_init__(deployment)
+    except ActivationRegistryError as exc:
+        raise ActivationAuthorizationError(
+            "serving deployment no longer matches its construction snapshot"
+        ) from exc
+    if type(snapshot) is not RecoveredRouteSnapshot:
+        raise ActivationAuthorizationError("serving currentness requires exact RecoveredRouteSnapshot")
+
+    _require_route_snapshot_integrity(snapshot)
+    issued_event = snapshot.event
+    if (
+        issued_event.deployment.deployment_id != deployment.deployment_id
+        or issued_event.deployment.environment_id != deployment.environment_id
+    ):
+        raise ActivationAuthorizationError(
+            "serving deployment does not match the recovered route snapshot deployment"
+        )
+
+    structural_registry = registry._structural_registry
+    connection_factory = structural_registry.connection_factory
+    registry._require_runtime_capabilities()
+    _require_pinned_connection_factory(structural_registry, connection_factory)
+    with connection_factory() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                _SELECT_CURRENT_SERVING_STATE_SQL,
+                (deployment.deployment_id, deployment.environment_id),
+            )
+            row = cursor.fetchone()
+
+    # This is a read-only use boundary, so post-I/O integrity checks may fail closed without
+    # turning a committed write into an ambiguous failure.
+    registry._require_runtime_capabilities()
+    _require_pinned_connection_factory(structural_registry, connection_factory)
+    _require_route_snapshot_integrity(snapshot)
+    issued_event = snapshot.event
+    evidence = snapshot.evidence
+
+    if row is None:
+        raise ActivationConflictError("route snapshot was superseded by missing durable activation state")
+    if type(row) is not tuple or len(row) != 6:
+        raise ActivationAuthorizationError("serving state query returned invalid durable shape")
+    (
+        activation_sequence,
+        generation_id,
+        previous_generation_id,
+        event_kind,
+        evidence_bundle_sha256,
+        observed_at_unix_ms,
+    ) = row
+    if type(activation_sequence) is not int or activation_sequence <= 0:
+        raise ActivationAuthorizationError("serving state returned invalid activation sequence")
+    if type(generation_id) is not str:
+        raise ActivationAuthorizationError("serving state returned invalid generation id")
+    if previous_generation_id is not None and type(previous_generation_id) is not str:
+        raise ActivationAuthorizationError("serving state returned invalid previous generation id")
+    if type(event_kind) is not str:
+        raise ActivationAuthorizationError("serving state returned invalid event kind")
+    if evidence_bundle_sha256 is not None and type(evidence_bundle_sha256) is not str:
+        raise ActivationAuthorizationError("serving state returned invalid evidence digest")
+    if type(observed_at_unix_ms) is not int or observed_at_unix_ms <= 0:
+        raise ActivationAuthorizationError("serving state returned invalid database wall clock")
+
+    current_fields = (
+        activation_sequence,
+        generation_id,
+        previous_generation_id,
+        event_kind,
+        evidence_bundle_sha256,
+    )
+    issued_fields = (
+        issued_event.activation_sequence,
+        issued_event.generation_id,
+        issued_event.previous_generation_id,
+        issued_event.event_kind,
+        issued_event.evidence_bundle_sha256,
+    )
+    if current_fields != issued_fields:
+        raise ActivationConflictError("route snapshot was superseded by durable activation state")
+    if observed_at_unix_ms >= evidence.valid_until_unix_ms:
+        raise ActivationAuthorizationError(
+            "route snapshot recovery evidence expired before the serving decision"
+        )
+
+    return snapshot.available_route_ids
