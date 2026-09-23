@@ -94,8 +94,18 @@ def http_response_for_composition_error(error: Exception) -> CompositionHttpResp
     raise TypeError("error must be a product-composition routing failure")
 
 
-async def send_composition_error_response(send: AsgiSend, error: Exception) -> None:
-    """Emit exactly one complete ASGI HTTP response for a known composition failure."""
+async def send_composition_error_response(
+    send: AsgiSend,
+    error: Exception,
+    *,
+    request_method: object,
+) -> None:
+    """Emit one complete ASGI error response while preserving HEAD no-content semantics.
+
+    The raw request method is required because malformed requests can fail before method
+    canonicalization. Only an exact built-in ``HEAD`` value suppresses response content; every
+    other value receives the mapped problem body so an invalid method can still get a useful 400.
+    """
 
     response = http_response_for_composition_error(error)
     await send(
@@ -108,7 +118,9 @@ async def send_composition_error_response(send: AsgiSend, error: Exception) -> N
     await send(
         {
             "type": "http.response.body",
-            "body": response.body,
+            "body": b""
+            if type(request_method) is str and request_method == "HEAD"
+            else response.body,
             "more_body": False,
         }
     )
