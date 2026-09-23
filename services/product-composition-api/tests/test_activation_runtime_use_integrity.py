@@ -209,7 +209,10 @@ def test_transition_rechecks_and_pins_structural_registry_after_evidence(
     monkeypatch.setattr(PostgresActivationRegistry, method_name, unexpected_transition)
 
     operation: Callable[..., object] = getattr(registry, operation_name)
-    with pytest.raises(ActivationAuthorizationError, match="construction snapshot"):
+    with pytest.raises(
+        ActivationAuthorizationError,
+        match="structural registry no longer uses the admitted PostgreSQL connection factory",
+    ):
         operation(
             DeploymentIdentity(
                 deployment_id="orgmetra_gateway",
