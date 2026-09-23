@@ -48,6 +48,9 @@ WITH current_activation AS (
     WHERE deployment_id = %s AND environment_id = %s
     ORDER BY activation_sequence DESC
     LIMIT 1
+),
+serving_clock AS MATERIALIZED (
+    SELECT clock_timestamp() AS observed_at
 )
 SELECT
     current_activation.activation_sequence,
@@ -58,8 +61,10 @@ SELECT
     recovery_attestation.recovery_sequence,
     recovery_attestation.evidence_bundle_sha256 AS recovery_evidence_bundle_sha256,
     floor(extract(epoch FROM recovery_attestation.recovered_at) * 1000)::bigint AS recovered_at_unix_ms,
-    floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS observed_at_unix_ms
+    floor(extract(epoch FROM serving_clock.observed_at) * 1000)::bigint AS observed_at_unix_ms,
+    serving_clock.observed_at < recovery_attestation.recovered_at AS recovery_clock_rewound
 FROM current_activation
+CROSS JOIN serving_clock
 LEFT JOIN public.product_composition_recovery_attestation AS recovery_attestation
   ON recovery_attestation.deployment_id = current_activation.deployment_id
  AND recovery_attestation.environment_id = current_activation.environment_id
@@ -405,7 +410,7 @@ def current_route_ids_for_snapshot(
 
     if row is None:
         raise ActivationConflictError("route snapshot was superseded by missing durable activation state")
-    if type(row) is not tuple or len(row) != 9:
+    if type(row) is not tuple or len(row) != 10:
         raise ActivationAuthorizationError("serving state query returned invalid durable shape")
     (
         activation_sequence,
@@ -417,6 +422,7 @@ def current_route_ids_for_snapshot(
         durable_recovery_evidence_sha256,
         recovered_at_unix_ms,
         observed_at_unix_ms,
+        recovery_clock_rewound,
     ) = row
     if type(activation_sequence) is not int or activation_sequence <= 0:
         raise ActivationAuthorizationError("serving state returned invalid activation sequence")
@@ -442,6 +448,8 @@ def current_route_ids_for_snapshot(
         raise ActivationAuthorizationError("serving state returned invalid recovery timestamp")
     if type(observed_at_unix_ms) is not int or observed_at_unix_ms <= 0:
         raise ActivationAuthorizationError("serving state returned invalid database wall clock")
+    if type(recovery_clock_rewound) is not bool:
+        raise ActivationAuthorizationError("serving state returned invalid recovery clock ordering")
 
     current_fields = (
         activation_sequence,
@@ -467,7 +475,7 @@ def current_route_ids_for_snapshot(
         raise ActivationConflictError(
             "route snapshot durable recovery attestation no longer matches issued recovery evidence"
         )
-    if observed_at_unix_ms < recovered_at_unix_ms:
+    if recovery_clock_rewound or observed_at_unix_ms < recovered_at_unix_ms:
         raise ActivationAuthorizationError(
             "database wall clock moved behind recovery attestation"
         )
