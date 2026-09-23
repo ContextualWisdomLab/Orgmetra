@@ -12,9 +12,9 @@ from orgmetra_product_composition import (
     OwnerApiRelease,
     OwnerOperationObservation,
     ReleasedAuthorityEvidence,
-    available_route_ids_for,
     configuration_sha256,
 )
+from orgmetra_product_composition.route_availability import available_route_ids_for
 
 
 def _owner(service_id: str, release_version: str, digest_digit: str) -> OwnerApiRelease:
