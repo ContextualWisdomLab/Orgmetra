@@ -158,6 +158,27 @@ def test_head_error_response_emits_metadata_without_response_content() -> None:
     ]
 
 
+def test_malformed_method_error_retains_problem_content() -> None:
+    messages: list[dict[str, object]] = []
+
+    async def send(message: dict[str, object]) -> None:
+        messages.append(message)
+
+    asyncio.run(
+        send_composition_error_response(
+            send,
+            CompositionRequestError("invalid method"),
+            request_method=None,
+        )
+    )
+
+    assert messages[1] == {
+        "type": "http.response.body",
+        "body": b'{"code":"invalid_request","status":400,"title":"Bad Request","type":"about:blank"}',
+        "more_body": False,
+    }
+
+
 def test_unknown_exception_is_not_laundered_into_a_composition_http_response() -> None:
     with pytest.raises(TypeError):
         http_response_for_composition_error(RuntimeError("foreign failure"))
