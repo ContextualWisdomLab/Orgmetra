@@ -9,6 +9,7 @@ from orgmetra_product_composition import (
     AuthorizedRecoveredActivation,
     CompositionGeneration,
     CompositionMethodNotAllowedError,
+    CompositionMethodNotImplementedError,
     CompositionRoute,
     CompositionRouteNotFoundError,
     DeploymentIdentity,
@@ -128,6 +129,19 @@ def test_unknown_declared_path_is_rejected_before_postgres_currentness() -> None
             snapshot,
             method="GET",
             request_path="/v1/jobs/job_123",
+        )
+
+
+def test_unimplemented_method_is_rejected_before_route_or_postgres_authority() -> None:
+    registry, deployment, snapshot = _fixture()
+
+    with pytest.raises(CompositionMethodNotImplementedError):
+        current_route_id_for_request(
+            registry,
+            deployment,
+            snapshot,
+            method="CONNECT",
+            request_path="/v1/people/person_123",
         )
 
 
