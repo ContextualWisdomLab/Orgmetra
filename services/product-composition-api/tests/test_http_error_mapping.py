@@ -70,12 +70,12 @@ def test_method_not_allowed_carries_canonical_allow_authority() -> None:
 
     response, payload = _decoded_problem(error)
 
-    assert error.allowed_methods == ("GET", "POST")
+    assert error.allowed_methods == ("GET", "HEAD", "POST")
     assert response.status == 405
     assert response.headers == (
         (b"content-type", b"application/problem+json"),
         (b"cache-control", b"no-store"),
-        (b"allow", b"GET, POST"),
+        (b"allow", b"GET, HEAD, POST"),
     )
     assert payload == {
         "code": "method_not_allowed",
