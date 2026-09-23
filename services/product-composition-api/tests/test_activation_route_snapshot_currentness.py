@@ -213,3 +213,85 @@ def test_current_route_ids_recheck_snapshot_after_connection_callback() -> None:
 
     with pytest.raises(ActivationAuthorizationError, match="route coverage"):
         current_route_ids_for_snapshot(registry, deployment, snapshot)
+
+
+def test_current_route_ids_require_exact_product_boundaries() -> None:
+    deployment, snapshot = _snapshot()
+    registry, _ = _registry(_current_row(snapshot))
+
+    with pytest.raises(ActivationAuthorizationError, match="exact AuthorizedPostgres"):
+        current_route_ids_for_snapshot(object(), deployment, snapshot)  # type: ignore[arg-type]
+    with pytest.raises(ActivationAuthorizationError, match="exact DeploymentIdentity"):
+        current_route_ids_for_snapshot(registry, object(), snapshot)  # type: ignore[arg-type]
+    with pytest.raises(ActivationAuthorizationError, match="exact RecoveredRouteSnapshot"):
+        current_route_ids_for_snapshot(registry, deployment, object())  # type: ignore[arg-type]
+
+
+def test_current_route_ids_reject_retargeted_deployment_identity() -> None:
+    deployment, snapshot = _snapshot()
+    registry, cursor = _registry(_current_row(snapshot))
+    object.__setattr__(deployment, "environment_id", "staging")
+
+    with pytest.raises(ActivationAuthorizationError, match="serving deployment"):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
+    assert cursor.executions == []
+
+
+def test_current_route_ids_reject_missing_durable_activation() -> None:
+    deployment, snapshot = _snapshot()
+    registry, _ = _registry(None)
+
+    with pytest.raises(ActivationConflictError, match="missing durable activation"):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        [],
+        (1, "generation_serving_currentness", None, "activate", "a" * 64),
+    ],
+)
+def test_current_route_ids_reject_invalid_query_shape(row) -> None:
+    deployment, snapshot = _snapshot()
+    registry, _ = _registry(row)
+
+    with pytest.raises(ActivationAuthorizationError, match="invalid durable shape"):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
+
+
+@pytest.mark.parametrize(
+    ("field_index", "replacement", "message"),
+    [
+        (0, True, "activation sequence"),
+        (0, 0, "activation sequence"),
+        (1, object(), "generation id"),
+        (2, object(), "previous generation id"),
+        (3, object(), "event kind"),
+        (4, object(), "evidence digest"),
+        (5, True, "database wall clock"),
+        (5, 0, "database wall clock"),
+    ],
+)
+def test_current_route_ids_reject_invalid_durable_field_types(
+    field_index,
+    replacement,
+    message,
+) -> None:
+    deployment, snapshot = _snapshot()
+    row = list(_current_row(snapshot))
+    row[field_index] = replacement
+    registry, _ = _registry(tuple(row))
+
+    with pytest.raises(ActivationAuthorizationError, match=message):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
+
+
+def test_current_route_ids_treat_missing_current_evidence_digest_as_supersession() -> None:
+    deployment, snapshot = _snapshot()
+    row = list(_current_row(snapshot))
+    row[4] = None
+    registry, _ = _registry(tuple(row))
+
+    with pytest.raises(ActivationConflictError, match="superseded"):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
