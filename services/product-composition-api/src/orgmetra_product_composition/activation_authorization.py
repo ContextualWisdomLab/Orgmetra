@@ -649,6 +649,7 @@ class AuthorizedRecoveredActivation:
     event: ActivationEvent
     generation: CompositionGeneration
     evidence: ActivationAdmissionEvidence
+    recovery_sequence: int | None = None
 
 
 def _persist_activation_evidence(cursor: Any, evidence: ActivationAdmissionEvidence) -> None:
@@ -839,4 +840,5 @@ class AuthorizedPostgresActivationRegistry:
             event=second.event,
             generation=second.generation,
             evidence=evidence,
+            recovery_sequence=second.recovery_sequence,
         )
