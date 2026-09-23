@@ -205,6 +205,35 @@ def test_receive_must_be_callable_before_any_io() -> None:
         )
 
 
+def test_receive_result_must_be_awaitable_before_event_validation() -> None:
+    """Reject a callable that violates the ASGI awaitable receive contract without leaking TypeError."""
+
+    class _SynchronousReceive:
+        """Return an event synchronously to model a malformed injected ASGI receive capability."""
+
+        def __init__(self) -> None:
+            """Track how many times the malformed capability is invoked."""
+
+            self.calls = 0
+
+        def __call__(self) -> object:
+            """Return a non-awaitable event object instead of the required awaitable."""
+
+            self.calls += 1
+            return {"type": "http.request"}
+
+    receive = _SynchronousReceive()
+    with pytest.raises(CompositionRequestBodyError, match="awaitable"):
+        asyncio.run(
+            read_bounded_http_request_body(
+                receive,  # type: ignore[arg-type]
+                max_body_bytes=16,
+                max_receive_events=1,
+            )
+        )
+    assert receive.calls == 1
+
+
 def test_receive_cancellation_propagates_without_timeout_reclassification() -> None:
     """Preserve task cancellation so callers can distinguish cancellation from protocol failure."""
 
