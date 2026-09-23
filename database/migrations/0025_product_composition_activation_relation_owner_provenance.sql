@@ -208,6 +208,7 @@ DECLARE
     evidence_authorization_action text;
     evidence_authorized_state_sequence bigint;
     evidence_valid_until_unix_ms bigint;
+    recovery_wall_clock timestamptz;
     wall_clock_unix_ms bigint;
 BEGIN
     SELECT activation_sequence, generation_id
@@ -257,7 +258,9 @@ BEGIN
             'product composition recovery evidence does not authorize exact active state';
     END IF;
 
-    wall_clock_unix_ms := floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint;
+    recovery_wall_clock := clock_timestamp();
+    wall_clock_unix_ms := floor(extract(epoch FROM recovery_wall_clock) * 1000)::bigint;
+    NEW.recovered_at := recovery_wall_clock;
     IF wall_clock_unix_ms >= evidence_valid_until_unix_ms THEN
         RAISE EXCEPTION 'product composition recovery authorization evidence is expired';
     END IF;
