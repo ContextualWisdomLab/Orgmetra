@@ -218,3 +218,16 @@ def test_current_route_ids_reject_database_wall_clock_rewind_before_recovery_com
 
     with pytest.raises(ActivationAuthorizationError, match="behind recovery attestation"):
         current_route_ids_for_snapshot(registry, deployment, snapshot)
+
+
+def test_current_route_ids_reject_submillisecond_database_wall_clock_rewind() -> None:
+    deployment, snapshot = _snapshot()
+    row_with_exact_rewind = _current_row(
+        snapshot,
+        recovered_at_unix_ms=1_500,
+        now_unix_ms=1_500,
+    ) + (True,)
+    registry, _ = _registry(row_with_exact_rewind)
+
+    with pytest.raises(ActivationAuthorizationError, match="behind recovery attestation"):
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
