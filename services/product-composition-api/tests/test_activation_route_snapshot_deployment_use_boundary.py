@@ -149,6 +149,7 @@ def test_serving_currentness_pins_validated_deployment_coordinates_across_connec
             snapshot.evidence.bundle_sha256(),
             1_250,
             1_500,
+            False,
         )
     )
 
