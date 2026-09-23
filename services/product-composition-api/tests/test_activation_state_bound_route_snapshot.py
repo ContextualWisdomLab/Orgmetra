@@ -9,12 +9,12 @@ from orgmetra_product_composition import (
     ActivationAuthorizationError,
     ActivationEvent,
     AuthorizedPostgresActivationRegistry,
+    AuthorizedRecoveredActivation,
     CompositionGeneration,
     CompositionRoute,
     DeploymentIdentity,
     OwnerApiRelease,
     OwnerOperationObservation,
-    RecoveredActivation,
     RecoveredRouteSnapshot,
     ReleasedAuthorityEvidence,
     configuration_sha256,
@@ -108,12 +108,29 @@ def _required_only_recovery_evidence(
     )
 
 
-def test_route_snapshot_projects_only_after_locked_recovery_recheck_without_post_commit_clock(
-    monkeypatch,
-) -> None:
-    deployment = DeploymentIdentity("orgmetra_gateway", "production")
-    generation = _generation()
-    structural = RecoveredActivation(
+def _registry() -> AuthorizedPostgresActivationRegistry:
+    def connection_factory():
+        raise AssertionError("route snapshot test must not open PostgreSQL directly")
+
+    def evidence_provider(*args):
+        raise AssertionError("route snapshot test delegates re-admission to recover_active")
+
+    def clock_unix_ms() -> int:
+        raise AssertionError("route snapshot projection must not sample a post-commit clock")
+
+    return AuthorizedPostgresActivationRegistry(
+        connection_factory=connection_factory,
+        evidence_provider=evidence_provider,
+        clock_unix_ms=clock_unix_ms,
+    )
+
+
+def _authorized_recovery(
+    deployment: DeploymentIdentity,
+    generation: CompositionGeneration,
+    evidence: ActivationAdmissionEvidence,
+) -> AuthorizedRecoveredActivation:
+    return AuthorizedRecoveredActivation(
         event=ActivationEvent(
             deployment=deployment,
             activation_sequence=1,
@@ -123,122 +140,68 @@ def test_route_snapshot_projects_only_after_locked_recovery_recheck_without_post
             evidence_bundle_sha256="a" * 64,
         ),
         generation=generation,
+        evidence=evidence,
     )
+
+
+def test_route_snapshot_projects_only_after_authorized_recovery_commit(monkeypatch) -> None:
+    deployment = DeploymentIdentity("orgmetra_gateway", "production")
+    generation = _generation()
     evidence = _required_only_recovery_evidence(generation)
-    locked_rechecks = 0
-    clock_reads = 0
+    recovered = _authorized_recovery(deployment, generation, evidence)
+    registry = _registry()
+    recovery_calls = 0
 
-    class StructuralRegistry:
-        def __init__(self, connection_factory):
-            self.connection_factory = connection_factory
-
-        def recover_active(self, deployment_arg, *, _connection_factory=None):
-            assert deployment_arg == deployment
-            assert _connection_factory is self.connection_factory
-            return structural
-
-        def recover_active_authorized(
-            self,
-            deployment_arg,
-            *,
-            expected_activation_sequence,
-            expected_generation_id,
-            evidence_bundle_sha256,
-            evidence_writer,
-            _connection_factory=None,
-        ):
-            nonlocal locked_rechecks
-            locked_rechecks += 1
-            assert deployment_arg == deployment
-            assert expected_activation_sequence == 1
-            assert expected_generation_id == generation.generation_id
-            assert evidence_bundle_sha256 == evidence.bundle_sha256()
-            assert callable(evidence_writer)
-            assert _connection_factory is self.connection_factory
-            return structural
-
-    def evidence_provider(deployment_arg, generation_arg, authorization_action, state_sequence):
+    def recover_active(self, deployment_arg):
+        nonlocal recovery_calls
+        recovery_calls += 1
+        assert self is registry
         assert deployment_arg == deployment
-        assert generation_arg == generation
-        assert authorization_action == "recover"
-        assert state_sequence == 1
-        return evidence
+        return recovered
 
-    def clock_unix_ms() -> int:
-        nonlocal clock_reads
-        clock_reads += 1
-        if clock_reads > 2:
-            raise AssertionError("state-bound route projection must not sample the clock after commit")
-        return 1_500
-
-    class ProductRecoveryHarness(AuthorizedPostgresActivationRegistry):
-        __slots__ = ()
-
-        def _require_runtime_capabilities(self) -> None:
-            return None
-
-    registry = ProductRecoveryHarness(
-        connection_factory=lambda: None,
-        evidence_provider=evidence_provider,
-        clock_unix_ms=clock_unix_ms,
-    )
-    monkeypatch.setattr(
-        registry,
-        "_structural_registry",
-        StructuralRegistry(registry.connection_factory),
-    )
+    monkeypatch.setattr(AuthorizedPostgresActivationRegistry, "recover_active", recover_active)
 
     snapshot = recover_active_route_snapshot(registry, deployment)
 
     assert type(snapshot) is RecoveredRouteSnapshot
-    assert snapshot.event == structural.event
+    assert snapshot.event == recovered.event
     assert snapshot.generation == generation
     assert snapshot.evidence == evidence
     assert snapshot.available_route_ids == ("people_get",)
-    assert locked_rechecks == 1
-    assert clock_reads == 2
+    assert recovery_calls == 1
 
 
-def test_route_snapshot_returns_none_when_no_generation_is_active() -> None:
+def test_route_snapshot_returns_none_when_no_generation_is_active(monkeypatch) -> None:
     deployment = DeploymentIdentity("orgmetra_gateway", "production")
+    registry = _registry()
 
-    class NoActiveRegistry(AuthorizedPostgresActivationRegistry):
-        __slots__ = ()
+    def recover_active(self, deployment_arg):
+        assert self is registry
+        assert deployment_arg == deployment
+        return None
 
-        def recover_active(self, deployment_arg):
-            assert deployment_arg == deployment
-            return None
-
-    registry = NoActiveRegistry(
-        connection_factory=lambda: None,
-        evidence_provider=lambda *args: cast(ActivationAdmissionEvidence, object()),
-        clock_unix_ms=lambda: 1_500,
-    )
+    monkeypatch.setattr(AuthorizedPostgresActivationRegistry, "recover_active", recover_active)
 
     assert recover_active_route_snapshot(registry, deployment) is None
 
 
-def test_route_snapshot_rejects_non_registry_and_noncanonical_recovery_result() -> None:
+def test_route_snapshot_rejects_non_registry_and_noncanonical_recovery_result(monkeypatch) -> None:
     deployment = DeploymentIdentity("orgmetra_gateway", "production")
 
-    with pytest.raises(ActivationAuthorizationError, match="requires Authorized"):
+    with pytest.raises(ActivationAuthorizationError, match="requires exact"):
         recover_active_route_snapshot(
             cast(AuthorizedPostgresActivationRegistry, object()),
             deployment,
         )
 
-    class InvalidRecoveryRegistry(AuthorizedPostgresActivationRegistry):
-        __slots__ = ()
+    registry = _registry()
 
-        def recover_active(self, deployment_arg):
-            assert deployment_arg == deployment
-            return object()
+    def recover_active(self, deployment_arg):
+        assert self is registry
+        assert deployment_arg == deployment
+        return object()
 
-    registry = InvalidRecoveryRegistry(
-        connection_factory=lambda: None,
-        evidence_provider=lambda *args: cast(ActivationAdmissionEvidence, object()),
-        clock_unix_ms=lambda: 1_500,
-    )
+    monkeypatch.setattr(AuthorizedPostgresActivationRegistry, "recover_active", recover_active)
     with pytest.raises(ActivationAuthorizationError, match="exact AuthorizedRecoveredActivation"):
         recover_active_route_snapshot(registry, deployment)
 
