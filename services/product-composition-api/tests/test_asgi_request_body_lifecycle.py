@@ -126,6 +126,18 @@ def test_body_limit_configuration_is_bounded_and_exact(max_body_bytes: object) -
     assert receive.calls == 0
 
 
+def test_receive_must_be_callable_before_any_io() -> None:
+    """Reject a non-callable receive boundary before attempting request-body lifecycle I/O."""
+
+    with pytest.raises(CompositionRequestBodyError, match="receive"):
+        asyncio.run(
+            read_bounded_http_request_body(
+                object(),  # type: ignore[arg-type]
+                max_body_bytes=16,
+            )
+        )
+
+
 def test_receive_cancellation_propagates_without_timeout_reclassification() -> None:
     """Preserve task cancellation so callers can distinguish cancellation from protocol failure."""
 
