@@ -8,6 +8,7 @@ from typing import Awaitable, Callable
 
 from .request_routing import (
     CompositionMethodNotAllowedError,
+    CompositionMethodNotImplementedError,
     CompositionRequestError,
     CompositionRouteNotFoundError,
     CompositionRouteUnavailableError,
@@ -72,6 +73,12 @@ def http_response_for_composition_error(error: Exception) -> CompositionHttpResp
             status=400,
             code="invalid_request",
             title="Bad Request",
+        )
+    if isinstance(error, CompositionMethodNotImplementedError):
+        return _problem_response(
+            status=501,
+            code="method_not_implemented",
+            title="Not Implemented",
         )
     if isinstance(error, CompositionRouteNotFoundError):
         return _problem_response(
