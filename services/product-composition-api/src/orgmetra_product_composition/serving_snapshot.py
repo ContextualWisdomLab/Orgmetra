@@ -299,14 +299,16 @@ def current_route_ids_for_snapshot(
         raise ActivationAuthorizationError(
             "serving deployment no longer matches its construction snapshot"
         ) from exc
+    deployment_id = deployment.deployment_id
+    environment_id = deployment.environment_id
     if type(snapshot) is not RecoveredRouteSnapshot:
         raise ActivationAuthorizationError("serving currentness requires exact RecoveredRouteSnapshot")
 
     _require_route_snapshot_integrity(snapshot)
     issued_event = snapshot.event
     if (
-        issued_event.deployment.deployment_id != deployment.deployment_id
-        or issued_event.deployment.environment_id != deployment.environment_id
+        issued_event.deployment.deployment_id != deployment_id
+        or issued_event.deployment.environment_id != environment_id
     ):
         raise ActivationAuthorizationError(
             "serving deployment does not match the recovered route snapshot deployment"
@@ -320,7 +322,7 @@ def current_route_ids_for_snapshot(
         with connection.cursor() as cursor:
             cursor.execute(
                 _SELECT_CURRENT_SERVING_STATE_SQL,
-                (deployment.deployment_id, deployment.environment_id),
+                (deployment_id, environment_id),
             )
             row = cursor.fetchone()
 
@@ -328,6 +330,14 @@ def current_route_ids_for_snapshot(
     # turning a committed write into an ambiguous failure.
     registry._require_runtime_capabilities()
     _require_pinned_connection_factory(structural_registry, connection_factory)
+    try:
+        DeploymentIdentity.__post_init__(deployment)
+    except ActivationRegistryError as exc:
+        raise ActivationAuthorizationError(
+            "serving deployment changed across database use"
+        ) from exc
+    if deployment.deployment_id != deployment_id or deployment.environment_id != environment_id:
+        raise ActivationAuthorizationError("serving deployment changed across database use")
     _require_route_snapshot_integrity(snapshot)
     issued_event = snapshot.event
     evidence = snapshot.evidence
