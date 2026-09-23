@@ -6,7 +6,8 @@ internal evidence-only route projection: the returned generation and evidence we
 against the deployment's then-current durable activation state under the deployment row lock.
 
 A snapshot is not perpetual dispatch authority. A serving adapter must discard it when its
-activation sequence is superseded and must not use it after the embedded evidence expires.
+activation sequence is superseded, when its durable recovery attestation disappears, or after
+the embedded evidence expires.
 """
 
 from __future__ import annotations
@@ -34,17 +35,43 @@ from .admission import CompositionGeneration, _revalidate_generation_snapshot
 
 
 _SELECT_CURRENT_SERVING_STATE_SQL = """
+WITH current_activation AS (
+    SELECT
+        deployment_id,
+        environment_id,
+        activation_sequence,
+        generation_id,
+        previous_generation_id,
+        event_kind,
+        evidence_bundle_sha256
+    FROM public.product_composition_activation_event
+    WHERE deployment_id = %s AND environment_id = %s
+    ORDER BY activation_sequence DESC
+    LIMIT 1
+)
 SELECT
-    activation_sequence,
-    generation_id,
-    previous_generation_id,
-    event_kind,
-    evidence_bundle_sha256,
+    current_activation.activation_sequence,
+    current_activation.generation_id,
+    current_activation.previous_generation_id,
+    current_activation.event_kind,
+    current_activation.evidence_bundle_sha256,
+    recovery.evidence_bundle_sha256 AS recovery_evidence_bundle_sha256,
+    floor(extract(epoch FROM recovery.recovered_at) * 1000)::bigint AS recovered_at_unix_ms,
     floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS observed_at_unix_ms
-FROM public.product_composition_activation_event
-WHERE deployment_id = %s AND environment_id = %s
-ORDER BY activation_sequence DESC
-LIMIT 1
+FROM current_activation
+LEFT JOIN LATERAL (
+    SELECT
+        recovery_attestation.evidence_bundle_sha256,
+        recovery_attestation.recovered_at
+    FROM public.product_composition_recovery_attestation AS recovery_attestation
+    WHERE recovery_attestation.deployment_id = current_activation.deployment_id
+      AND recovery_attestation.environment_id = current_activation.environment_id
+      AND recovery_attestation.activation_sequence = current_activation.activation_sequence
+      AND recovery_attestation.generation_id = current_activation.generation_id
+      AND recovery_attestation.evidence_bundle_sha256 = %s
+    ORDER BY recovery_attestation.recovery_sequence DESC
+    LIMIT 1
+) AS recovery ON TRUE
 """.strip()
 
 
@@ -279,12 +306,13 @@ def current_route_ids_for_snapshot(
     deployment: DeploymentIdentity,
     snapshot: RecoveredRouteSnapshot,
 ) -> tuple[str, ...]:
-    """Return routes only if the snapshot is current and fresh at one PostgreSQL read.
+    """Return routes only if snapshot state, attestation and freshness survive one DB read.
 
-    The database statement is the routing-decision linearization point. No recovery attestation
-    is written and no process-local clock is consulted. A later activation may supersede this
-    decision after the read, so callers must invoke this at the request-routing boundary rather
-    than treating a successful result as a perpetual cache grant.
+    The database statement is the routing-decision linearization point. It rechecks both the
+    current activation and the exact recovery attestation that issued the snapshot, while using
+    PostgreSQL wall clock as freshness authority. A later activation may supersede this decision
+    after the read, so callers must invoke this at the request-routing boundary rather than
+    treating a successful result as a perpetual cache grant.
     """
 
     if type(registry) is not AuthorizedPostgresActivationRegistry:
@@ -306,6 +334,9 @@ def current_route_ids_for_snapshot(
 
     _require_route_snapshot_integrity(snapshot)
     issued_event = snapshot.event
+    evidence = snapshot.evidence
+    recovery_evidence_bundle_sha256 = evidence.bundle_sha256()
+    recovery_valid_until_unix_ms = evidence.valid_until_unix_ms
     if (
         issued_event.deployment.deployment_id != deployment_id
         or issued_event.deployment.environment_id != environment_id
@@ -322,7 +353,11 @@ def current_route_ids_for_snapshot(
         with connection.cursor() as cursor:
             cursor.execute(
                 _SELECT_CURRENT_SERVING_STATE_SQL,
-                (deployment_id, environment_id),
+                (
+                    deployment_id,
+                    environment_id,
+                    recovery_evidence_bundle_sha256,
+                ),
             )
             row = cursor.fetchone()
 
@@ -341,10 +376,15 @@ def current_route_ids_for_snapshot(
     _require_route_snapshot_integrity(snapshot)
     issued_event = snapshot.event
     evidence = snapshot.evidence
+    if (
+        evidence.bundle_sha256() != recovery_evidence_bundle_sha256
+        or evidence.valid_until_unix_ms != recovery_valid_until_unix_ms
+    ):
+        raise ActivationAuthorizationError("route snapshot recovery evidence changed across database use")
 
     if row is None:
         raise ActivationConflictError("route snapshot was superseded by missing durable activation state")
-    if type(row) is not tuple or len(row) != 6:
+    if type(row) is not tuple or len(row) != 8:
         raise ActivationAuthorizationError("serving state query returned invalid durable shape")
     (
         activation_sequence,
@@ -352,6 +392,8 @@ def current_route_ids_for_snapshot(
         previous_generation_id,
         event_kind,
         evidence_bundle_sha256,
+        durable_recovery_evidence_sha256,
+        recovered_at_unix_ms,
         observed_at_unix_ms,
     ) = row
     if type(activation_sequence) is not int or activation_sequence <= 0:
@@ -364,6 +406,12 @@ def current_route_ids_for_snapshot(
         raise ActivationAuthorizationError("serving state returned invalid event kind")
     if evidence_bundle_sha256 is not None and type(evidence_bundle_sha256) is not str:
         raise ActivationAuthorizationError("serving state returned invalid evidence digest")
+    if durable_recovery_evidence_sha256 is None and recovered_at_unix_ms is None:
+        raise ActivationConflictError("route snapshot durable recovery attestation is missing")
+    if type(durable_recovery_evidence_sha256) is not str:
+        raise ActivationAuthorizationError("serving state returned invalid recovery evidence digest")
+    if type(recovered_at_unix_ms) is not int or recovered_at_unix_ms <= 0:
+        raise ActivationAuthorizationError("serving state returned invalid recovery timestamp")
     if type(observed_at_unix_ms) is not int or observed_at_unix_ms <= 0:
         raise ActivationAuthorizationError("serving state returned invalid database wall clock")
 
@@ -383,7 +431,15 @@ def current_route_ids_for_snapshot(
     )
     if current_fields != issued_fields:
         raise ActivationConflictError("route snapshot was superseded by durable activation state")
-    if observed_at_unix_ms >= evidence.valid_until_unix_ms:
+    if durable_recovery_evidence_sha256 != recovery_evidence_bundle_sha256:
+        raise ActivationConflictError(
+            "route snapshot durable recovery attestation no longer matches issued recovery evidence"
+        )
+    if observed_at_unix_ms < recovered_at_unix_ms:
+        raise ActivationAuthorizationError(
+            "database wall clock moved behind recovery attestation"
+        )
+    if observed_at_unix_ms >= recovery_valid_until_unix_ms:
         raise ActivationAuthorizationError(
             "route snapshot recovery evidence expired before the serving decision"
         )
