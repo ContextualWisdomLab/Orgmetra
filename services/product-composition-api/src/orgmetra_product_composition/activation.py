@@ -209,6 +209,7 @@ class ActivationEvent:
         """Enforce sequence, lineage and optional evidence invariants on one event."""
         if type(self.deployment) is not DeploymentIdentity:
             raise ActivationRegistryError("activation event requires exact DeploymentIdentity")
+        DeploymentIdentity.__post_init__(self.deployment)
         if type(self.activation_sequence) is not int or self.activation_sequence <= 0:
             raise ActivationRegistryError("activation_sequence must be an integer > 0")
         _canonical_identifier("generation_id", self.generation_id)
@@ -536,11 +537,19 @@ class PostgresActivationRegistry:
 
     @staticmethod
     def _deployment(deployment: DeploymentIdentity) -> DeploymentIdentity:
-        """Revalidate an exact deployment object before it enters a durable transaction."""
+        """Detach validated deployment coordinates before any durable adapter can invoke callbacks."""
         if type(deployment) is not DeploymentIdentity:
             raise ActivationRegistryError("deployment must be exact DeploymentIdentity")
         DeploymentIdentity.__post_init__(deployment)
-        return deployment
+        deployment_id = deployment.deployment_id
+        environment_id = deployment.environment_id
+        DeploymentIdentity.__post_init__(deployment)
+        if deployment.deployment_id != deployment_id or deployment.environment_id != environment_id:
+            raise ActivationRegistryError("deployment changed while coordinates were being pinned")
+        return DeploymentIdentity(
+            deployment_id=deployment_id,
+            environment_id=environment_id,
+        )
 
     @staticmethod
     def _lock_deployment(cursor: Any, deployment: DeploymentIdentity) -> None:
