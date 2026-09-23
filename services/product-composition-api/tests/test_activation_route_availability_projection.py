@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from orgmetra_product_composition import (
@@ -164,3 +166,10 @@ def test_route_availability_reuses_current_evidence_freshness_and_coverage_gate(
     required_only = _evidence(generation, (_observation(required_route, "GET", "8"),))
     with pytest.raises(ActivationAuthorizationError, match="evidence is expired"):
         _available_route_ids(required_only, generation, now_unix_ms=2_000)
+
+
+def test_route_availability_rejects_non_evidence_values_before_projection() -> None:
+    generation = _generation()
+
+    with pytest.raises(ActivationAuthorizationError, match="exact ActivationAdmissionEvidence"):
+        _available_route_ids(cast(ActivationAdmissionEvidence, object()), generation)
