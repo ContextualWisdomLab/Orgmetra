@@ -48,6 +48,10 @@ class CompositionMethodNotAllowedError(CompositionRoutingError):
         canonical_methods = tuple(
             sorted({_canonical_request_method(method) for method in allowed_methods})
         )
+        if any(method not in _ALLOWED_METHODS for method in canonical_methods):
+            raise CompositionRoutingError(
+                "method rejection Allow authority must use implemented composition methods"
+            )
         self.allowed_methods = canonical_methods
         super().__init__(message)
 
