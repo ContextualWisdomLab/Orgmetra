@@ -16,7 +16,7 @@ from .activation_runtime_integrity import AuthorizedPostgresActivationRegistry
 from .admission import CompositionGeneration, CompositionRoute, _ALLOWED_METHODS
 from .serving_snapshot import RecoveredRouteSnapshot, current_route_ids_for_snapshot
 
-_REQUEST_METHOD = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]{1,16}$")
+_REQUEST_METHOD = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
 _REQUEST_PATH = re.compile(r"^/v[0-9]+(?:/[A-Za-z0-9._:-]+)+$")
 _TEMPLATE_SEGMENT = re.compile(r"^\{[a-z][a-z0-9_]{0,63}\}$")
 
@@ -61,10 +61,10 @@ class CompositionRouteUnavailableError(CompositionRoutingError):
 
 
 def _canonical_request_method(method: object) -> str:
-    """Require one exact bounded RFC 9110 HTTP token without inventing owner operations."""
+    """Require one exact RFC 9110 HTTP method token without inventing owner operations."""
 
     if type(method) is not str or _REQUEST_METHOD.fullmatch(method) is None:
-        raise CompositionRequestError("request method must be an exact bounded HTTP token")
+        raise CompositionRequestError("request method must be an exact HTTP token")
     return method
 
 
