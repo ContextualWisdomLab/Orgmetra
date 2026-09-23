@@ -34,7 +34,11 @@ from .registry import (
     RouteMethodRecord,
     RouteRecord,
 )
-from .serving_snapshot import RecoveredRouteSnapshot, recover_active_route_snapshot
+from .serving_snapshot import (
+    RecoveredRouteSnapshot,
+    current_route_ids_for_snapshot,
+    recover_active_route_snapshot,
+)
 
 __all__ = [
     "ActivationAdmissionEvidence",
@@ -64,5 +68,6 @@ __all__ = [
     "RouteRecord",
     "admit_generation",
     "configuration_sha256",
+    "current_route_ids_for_snapshot",
     "recover_active_route_snapshot",
 ]
