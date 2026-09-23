@@ -278,6 +278,50 @@ def test_transaction_evidence_writer_verifies_exact_durable_material() -> None:
     assert "product_composition_activation_owner_observation" in statements
 
 
+def test_transaction_evidence_writer_normalizes_durable_observation_order() -> None:
+    base = _evidence()
+    template = base.owner_operations[0]
+    observations = tuple(
+        OwnerOperationObservation(
+            route_id=route_id,
+            path_template=template.path_template,
+            method=template.method,
+            service_id=template.service_id,
+            release_version=template.release_version,
+            openapi_sha256=template.openapi_sha256,
+            artifact_sha256=template.artifact_sha256,
+            observation_sha256=digest_digit * 64,
+            observed_at_unix_ms=template.observed_at_unix_ms,
+            valid_until_unix_ms=template.valid_until_unix_ms,
+        )
+        for route_id, digest_digit in (
+            ("position_update", "7"),
+            ("positions", "8"),
+        )
+    )
+    evidence = ActivationAdmissionEvidence(
+        deployment_id=base.deployment_id,
+        environment_id=base.environment_id,
+        generation_id=base.generation_id,
+        config_sha256=base.config_sha256,
+        authorization_action=base.authorization_action,
+        authorized_state_sequence=base.authorized_state_sequence,
+        keyverse_authority=base.keyverse_authority,
+        orgmetra_authority=base.orgmetra_authority,
+        orgmetra_policy_version_code=base.orgmetra_policy_version_code,
+        authorization_decision_sha256=base.authorization_decision_sha256,
+        owner_operations=observations,
+        valid_until_unix_ms=base.valid_until_unix_ms,
+    )
+    expected_rows = evidence._observation_rows()
+    cursor = EvidenceCursor(
+        root_row=evidence._root_row(),
+        observation_rows=tuple(reversed(expected_rows)),
+    )
+
+    _persist_activation_evidence(cursor, evidence)
+
+
 def test_transaction_evidence_writer_rejects_digest_collision_material() -> None:
     evidence = _evidence()
     wrong_root = list(evidence._root_row())
