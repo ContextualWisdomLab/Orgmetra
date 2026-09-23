@@ -121,6 +121,7 @@ def test_method_not_allowed_rejects_noncanonical_allow_authority(
     "mutated_methods",
     [
         ("GET",),
+        ("POST",),
         ("TRACE",),
         ("GET\r\nx-injected: true",),
     ],
