@@ -22,7 +22,10 @@ from orgmetra_product_composition import (
     configuration_sha256,
     recover_active_route_snapshot,
 )
-from orgmetra_product_composition.serving_snapshot import _record_route_snapshot_integrity
+from orgmetra_product_composition.serving_snapshot import (
+    _issue_route_snapshot,
+    _record_route_snapshot_integrity,
+)
 
 
 def _generation(generation_id: str = "generation_optional") -> CompositionGeneration:
@@ -184,6 +187,7 @@ def _issue_snapshot(
         event=event_value,
         generation=generation_value,
         evidence=evidence_value,
+        recovery_sequence=1,
     )
     registry = _registry()
 
@@ -218,6 +222,7 @@ def test_route_snapshot_projects_recovery_bound_whole_route_coverage(
     assert snapshot.event.generation_id == generation.generation_id
     assert snapshot.generation == generation
     assert snapshot.evidence == evidence
+    assert snapshot.recovery_sequence == 1
     assert snapshot.available_route_ids == expected_route_ids
 
 
@@ -256,6 +261,20 @@ def test_route_snapshot_rejects_non_registry_and_noncanonical_recovery_result(mo
         recover_active_route_snapshot(registry, deployment)
 
 
+def test_route_snapshot_requires_committed_recovery_sequence() -> None:
+    deployment = DeploymentIdentity("orgmetra_gateway", "production")
+    generation = _generation()
+    evidence = _recovery_evidence(generation)
+    recovered = AuthorizedRecoveredActivation(
+        event=_event(deployment, generation),
+        generation=generation,
+        evidence=evidence,
+    )
+
+    with pytest.raises(ActivationAuthorizationError, match="committed recovery attestation sequence"):
+        _issue_route_snapshot(recovered)
+
+
 def test_route_snapshot_value_cannot_be_forged_through_public_constructor() -> None:
     with pytest.raises(ActivationAuthorizationError, match="issued only"):
         RecoveredRouteSnapshot()
@@ -273,6 +292,7 @@ def test_route_snapshot_rejects_fully_populated_but_unissued_raw_object(monkeypa
     object.__setattr__(raw, "_event", issued.event)
     object.__setattr__(raw, "_generation", issued.generation)
     object.__setattr__(raw, "_evidence", issued.evidence)
+    object.__setattr__(raw, "_recovery_sequence", issued.recovery_sequence)
     object.__setattr__(raw, "_available_route_ids", issued.available_route_ids)
 
     with pytest.raises(ActivationAuthorizationError, match="issuance snapshot"):
@@ -285,6 +305,8 @@ def test_route_snapshot_rejects_fully_populated_but_unissued_raw_object(monkeypa
         ("_event", object(), "exact ActivationEvent"),
         ("_generation", object(), "exact CompositionGeneration"),
         ("_evidence", object(), "exact ActivationAdmissionEvidence"),
+        ("_recovery_sequence", True, "recovery sequence"),
+        ("_recovery_sequence", 0, "recovery sequence"),
         ("_available_route_ids", ["people_get"], "exact tuple of str"),
         ("_available_route_ids", (object(),), "exact tuple of str"),
     ],
