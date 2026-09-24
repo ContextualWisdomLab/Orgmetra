@@ -124,6 +124,43 @@ def _require_core_http_response_event(event: object) -> dict[str, object]:
     return response_event
 
 
+def _require_complete_content_length(
+    *,
+    status: int,
+    headers: list[object],
+    representation_body: bytes,
+) -> None:
+    """Bind one explicit Content-Length to RFC 9110 final-response framing semantics."""
+
+    values = [
+        pair[1]
+        for pair in headers
+        if type(pair) in (list, tuple) and pair[0] == b"content-length"
+    ]
+    if not values:
+        return
+    if len(values) != 1:
+        raise CompositionResponseEventError(
+            "complete ASGI response content-length must appear at most once"
+        )
+    if status == 204:
+        raise CompositionResponseEventError(
+            "complete ASGI 204 response must not include content-length"
+        )
+
+    value = cast(bytes, values[0])
+    if not value or not value.isdigit():
+        raise CompositionResponseEventError(
+            "complete ASGI response content-length must be one decimal byte string"
+        )
+    normalized_value = value.lstrip(b"0") or b"0"
+    expected_octets = 0 if status == 205 else len(representation_body)
+    if normalized_value != str(expected_octets).encode("ascii"):
+        raise CompositionResponseEventError(
+            "complete ASGI response content-length does not match response semantics"
+        )
+
+
 async def send_asgi_response_event(send: object, event: object) -> None:
     """Send one validated core HTTP response event without reclassifying server failures.
 
@@ -168,8 +205,11 @@ async def send_complete_http_response(
     boundary. Both response-start and terminal response-body are validated before ``send`` is
     invoked, so malformed caller-owned body material cannot be discovered only after response-start
     has made the response irreversible. ``suppress_body`` supports HEAD-style content suppression
-    without changing response metadata; RFC 9110 no-content statuses 204, 205, and 304 suppress
-    representation bytes independently. The underlying representation body must still be bytes.
+    without changing representation metadata; RFC 9110 no-content statuses 204, 205, and 304
+    suppress representation bytes independently. An explicit Content-Length is accepted only when
+    it is unique and consistent with the selected representation, except that 204 forbids the field
+    and 205 can only describe the zero-octet response. The underlying representation body must still
+    be bytes so HEAD/304 metadata can be checked against the response this owner would otherwise send.
 
     Server/runtime failures raised while sending either event propagate unchanged. The helper does
     not retry, remap, or manufacture a second response after partial emission.
@@ -202,5 +242,10 @@ async def send_complete_http_response(
 
     _require_core_http_response_event(start_event)
     _require_core_http_response_event(body_event)
+    _require_complete_content_length(
+        status=status,
+        headers=cast(list[object], response_headers),
+        representation_body=body,
+    )
     await send_asgi_response_event(send, start_event)
     await send_asgi_response_event(send, body_event)
