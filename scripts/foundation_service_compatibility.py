@@ -35,8 +35,6 @@ class ProjectMetadata:
     version: str
     requires_python: SpecifierSet
     dependencies: tuple[Requirement, ...]
-    source_dir: Path | None = None
-    tests_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -101,13 +99,13 @@ def read_project(path: Path, *, require_layout: bool) -> ProjectMetadata:
             f"{path}: invalid project.requires-python {requires_python_text!r}"
         ) from exc
 
-    root = path.parent
-    source_dir = root / "src" if require_layout else None
-    tests_dir = root / "tests" if require_layout else None
-    if require_layout and (not source_dir.is_dir() or not tests_dir.is_dir()):
-        raise ServiceCompatibilityError(
-            f"{path}: owned service requires both src/ and tests/ directories"
-        )
+    if require_layout:
+        source_dir = path.parent / "src"
+        tests_dir = path.parent / "tests"
+        if not source_dir.is_dir() or not tests_dir.is_dir():
+            raise ServiceCompatibilityError(
+                f"{path}: owned service requires both src/ and tests/ directories"
+            )
 
     return ProjectMetadata(
         path=path,
@@ -116,8 +114,6 @@ def read_project(path: Path, *, require_layout: bool) -> ProjectMetadata:
         version=version,
         requires_python=requires_python,
         dependencies=_read_requirements(project, path),
-        source_dir=source_dir,
-        tests_dir=tests_dir,
     )
 
 
@@ -227,23 +223,14 @@ def plan_service_executions(
                 f"{service.path}: owned dependency source directory is missing: "
                 + ", ".join(str(path) for path in missing_sources)
             )
-        source_paths = [service.source_dir]
-        source_paths.extend(package_source_paths)
-        if any(path is None for path in source_paths):
-            raise AssertionError("service layout validation must provide source_dir")
-        executions.append(
-            ServiceExecution(
-                service=service,
-                source_paths=tuple(path for path in source_paths if path is not None),
-            )
-        )
+        source_paths = (service.path.parent / "src", *package_source_paths)
+        executions.append(ServiceExecution(service=service, source_paths=source_paths))
     return tuple(executions)
 
 
 def _run_pytest(service: ProjectMetadata, source_paths: tuple[Path, ...]) -> None:
     """Execute one service's own pytest configuration under an isolated coverage file."""
-    if service.tests_dir is None:
-        raise AssertionError("service layout validation must provide tests_dir")
+    tests_dir = service.path.parent / "tests"
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(str(path) for path in source_paths)
     env["COVERAGE_FILE"] = (
@@ -257,7 +244,7 @@ def _run_pytest(service: ProjectMetadata, source_paths: tuple[Path, ...]) -> Non
             "pytest",
             "-c",
             str(service.path),
-            str(service.tests_dir),
+            str(tests_dir),
         ],
         check=True,
         env=env,
