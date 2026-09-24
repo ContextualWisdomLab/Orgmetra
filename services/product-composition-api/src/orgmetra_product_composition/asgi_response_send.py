@@ -8,6 +8,9 @@ from typing import cast
 
 AsgiSend = Callable[[dict[str, object]], Awaitable[None]]
 _CORE_HTTP_RESPONSE_EVENT_TYPES = frozenset({"http.response.start", "http.response.body"})
+_HTTP_FIELD_NAME_OCTETS = frozenset(
+    b"!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyz"
+)
 
 
 class CompositionResponseEventError(ValueError):
@@ -16,6 +19,24 @@ class CompositionResponseEventError(ValueError):
 
 class CompositionResponseSendError(RuntimeError):
     """Raised when an injected ASGI send capability cannot satisfy its call contract."""
+
+
+def _require_http_field_name(name: bytes) -> None:
+    """Require one lowercased RFC 9110 token before handing a header to the ASGI server."""
+
+    if not name or any(octet not in _HTTP_FIELD_NAME_OCTETS for octet in name):
+        raise CompositionResponseEventError(
+            "ASGI http.response.start header names must be non-empty lowercase HTTP tokens"
+        )
+
+
+def _require_http_field_value(value: bytes) -> None:
+    """Reject HTTP field-value control octets that are invalid or dangerous on the wire."""
+
+    if any((octet < 0x20 and octet != 0x09) or octet == 0x7F for octet in value):
+        raise CompositionResponseEventError(
+            "ASGI http.response.start header values must not contain invalid HTTP control octets"
+        )
 
 
 def _require_response_headers(headers: object) -> None:
@@ -49,6 +70,8 @@ def _require_response_headers(headers: object) -> None:
             raise CompositionResponseEventError(
                 "ASGI http.response.start header names must be lowercased"
             )
+        _require_http_field_name(name)
+        _require_http_field_value(value)
 
 
 def _require_response_start(event: dict[str, object]) -> None:
@@ -105,8 +128,10 @@ async def send_asgi_response_event(send: object, event: object) -> None:
 
     The caller-owned event is validated before server invocation. This owner accepts only exact
     dictionaries for ``http.response.start`` and ``http.response.body`` and validates their core
-    ASGI field shapes. A response-start trailer promise is rejected because this boundary does not
-    yet own ``http.response.trailers`` emission; extension or trailer support requires an explicit
+    ASGI field shapes. Header names are constrained to lowercased HTTP tokens and invalid control
+    octets are rejected from values before an HTTP implementation can parse them inconsistently.
+    A response-start trailer promise is rejected because this boundary does not yet own
+    ``http.response.trailers`` emission; extension or trailer support requires an explicit
     scope-aware successor rather than silently widening this contract.
 
     The injected ``send`` capability must be callable and its normal return must be awaitable.
