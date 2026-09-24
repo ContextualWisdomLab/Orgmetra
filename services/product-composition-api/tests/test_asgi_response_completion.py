@@ -54,6 +54,28 @@ def test_complete_response_rejects_informational_status_as_final_response() -> N
     assert calls == 0
 
 
+def test_complete_response_rejects_invalid_headers_before_transport() -> None:
+    """Prevalidate response-start metadata before any irreversible send is attempted."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="response.start headers"):
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=200,
+                headers="not-headers",
+                body=b"ok",
+            )
+        )
+
+    assert calls == 0
+
+
 def test_complete_response_sends_start_then_one_terminal_body() -> None:
     """Emit exactly one response-start followed by one terminal response-body event."""
 
