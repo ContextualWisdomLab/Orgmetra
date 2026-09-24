@@ -59,9 +59,10 @@ jobs:
       - name: Prove Foundation service discovery provenance
         run: |
           sha256sum --check <<'EOF'
-          281c5e2537fbc50a6972533c036d033ba5d3fc70ebf550b18f3bf20cf89ea49e  scripts/foundation_service_compatibility.py
+          2c77d3e87a3b2e627135fc23ee19baa02f76388250c54d47b5989a2a5469d0a8  scripts/foundation_service_compatibility.py
           4519385d85ba280f133a60b91afff24d6a242655df1f9666cded3a0b81e05a88  tests/test_foundation_service_compatibility.py
           fd462c091975b219b2ad64f19ffbbc8d26a759de871be810f663bc6ef7c65ea0  tests/test_foundation_service_compatibility_edge.py
+          fbae635cbb2aba13fc1eae9cf4492f87a913e13842ff7855356d22b7bf1584d4  tests/test_foundation_service_identity.py
           0f313fee99c2ca6988f7783a4e2315caa99f001a39d2d3fe38f0dda8bf1aef20  tests/test_foundation_service_workflow.py
           EOF
       - name: Prove Foundation service discovery contract
@@ -70,6 +71,7 @@ jobs:
             python -m coverage run --branch --source=scripts -m pytest -q \
               tests/test_foundation_service_compatibility.py \
               tests/test_foundation_service_compatibility_edge.py \
+              tests/test_foundation_service_identity.py \
               tests/test_foundation_service_workflow.py
           COVERAGE_FILE=/tmp/orgmetra-foundation-service-discovery.coverage \
             python -m coverage report --include=scripts/foundation_service_compatibility.py --fail-under=100
