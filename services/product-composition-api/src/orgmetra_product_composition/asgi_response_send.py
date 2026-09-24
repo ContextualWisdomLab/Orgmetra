@@ -11,6 +11,7 @@ _CORE_HTTP_RESPONSE_EVENT_TYPES = frozenset({"http.response.start", "http.respon
 _HTTP_FIELD_NAME_OCTETS = frozenset(
     b"!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyz"
 )
+_NO_CONTENT_FINAL_STATUSES = frozenset({204, 205, 304})
 
 
 class CompositionResponseEventError(ValueError):
@@ -167,7 +168,8 @@ async def send_complete_http_response(
     boundary. Both response-start and terminal response-body are validated before ``send`` is
     invoked, so malformed caller-owned body material cannot be discovered only after response-start
     has made the response irreversible. ``suppress_body`` supports HEAD-style content suppression
-    without changing response metadata; the underlying representation body must still be bytes.
+    without changing response metadata; RFC 9110 no-content statuses 204, 205, and 304 suppress
+    representation bytes independently. The underlying representation body must still be bytes.
 
     Server/runtime failures raised while sending either event propagate unchanged. The helper does
     not retry, remap, or manufacture a second response after partial emission.
@@ -192,7 +194,9 @@ async def send_complete_http_response(
     }
     body_event: dict[str, object] = {
         "type": "http.response.body",
-        "body": b"" if suppress_body else body,
+        "body": b""
+        if suppress_body or status in _NO_CONTENT_FINAL_STATUSES
+        else body,
         "more_body": False,
     }
 
