@@ -6,6 +6,7 @@ import pytest
 
 from orgmetra_product_composition import CompositionRouteNotFoundError, send_composition_error_response
 from orgmetra_product_composition.asgi_response_send import (
+    CompositionResponseEventError,
     CompositionResponseSendError,
     send_asgi_response_event,
 )
@@ -98,6 +99,52 @@ def test_asgi_send_preserves_cancellation_from_awaitable() -> None:
 
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(send_asgi_response_event(send, _response_start_event()))
+
+
+def test_asgi_send_rejects_non_dict_response_event_before_transport() -> None:
+    """Reject a non-dict outbound message before invoking the ASGI server capability."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="dict"):
+        asyncio.run(send_asgi_response_event(send, object()))
+
+    assert calls == 0
+
+
+@pytest.mark.parametrize("event_type", [None, 17, "http.request", "websocket.send"])
+def test_asgi_send_rejects_non_http_response_event_type_before_transport(event_type: object) -> None:
+    """Keep inbound, foreign-protocol, missing, and non-string event types off the response channel."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="http.response"):
+        asyncio.run(send_asgi_response_event(send, {"type": event_type}))
+
+    assert calls == 0
+
+
+@pytest.mark.parametrize("event_type", ["http.response.start", "http.response.body"])
+def test_asgi_send_accepts_core_http_response_event_types(event_type: str) -> None:
+    """Allow both core HTTP response message types through the validated send boundary."""
+
+    events: list[dict[str, object]] = []
+
+    async def send(event: dict[str, object]) -> None:
+        events.append(event)
+
+    event = {"type": event_type}
+    asyncio.run(send_asgi_response_event(send, event))
+
+    assert events == [event]
 
 
 def test_error_response_uses_validated_send_capability() -> None:
