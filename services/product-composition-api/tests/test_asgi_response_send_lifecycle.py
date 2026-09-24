@@ -148,6 +148,8 @@ def test_asgi_send_rejects_non_http_response_event_type_before_transport(event_t
         {"type": "http.response.start"},
         {"type": "http.response.start", "status": True},
         {"type": "http.response.start", "status": 99},
+        {"type": "http.response.start", "status": 600},
+        {"type": "http.response.start", "status": 999},
         {"type": "http.response.start", "status": 1000},
         {"type": "http.response.start", "status": 200, "headers": "not-headers"},
         {"type": "http.response.start", "status": 200, "headers": [b"not-a-pair"]},
