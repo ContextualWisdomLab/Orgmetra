@@ -56,6 +56,14 @@ jobs:
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
+      - name: Prove Foundation service discovery provenance
+        run: |
+          sha256sum --check <<'EOF'
+          928bb44a9bedb3c81c31871de17db15629d2d7f6e9f4b1f60f04b540d6a4721b  scripts/foundation_service_compatibility.py
+          4519385d85ba280f133a60b91afff24d6a242655df1f9666cded3a0b81e05a88  tests/test_foundation_service_compatibility.py
+          b7b84b838f5fbd0f7cb690255d628e450a1ffc32e7b25a2ed88616abb2502cbc  tests/test_foundation_service_compatibility_edge.py
+          fb00f474848e82a8fd827de083d4d14e81be4b001b7825e4a8654a68abbb7546  tests/test_foundation_service_workflow.py
+          EOF
       - name: Prove Foundation service discovery contract
         run: |
           COVERAGE_FILE=/tmp/orgmetra-foundation-service-discovery.coverage \
