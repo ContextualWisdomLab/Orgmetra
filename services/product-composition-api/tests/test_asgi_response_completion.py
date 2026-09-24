@@ -16,6 +16,8 @@ def test_complete_response_prevalidates_entire_message_before_transport() -> Non
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation that should have been prevented by prevalidation."""
+
         nonlocal calls
         calls += 1
 
@@ -38,6 +40,8 @@ def test_complete_response_rejects_informational_status_as_final_response() -> N
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation for an invalid final-response status."""
+
         nonlocal calls
         calls += 1
 
@@ -60,6 +64,8 @@ def test_complete_response_rejects_invalid_headers_before_transport() -> None:
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation for malformed response-start metadata."""
+
         nonlocal calls
         calls += 1
 
@@ -82,6 +88,8 @@ def test_complete_response_sends_start_then_one_terminal_body() -> None:
     events: list[dict[str, object]] = []
 
     async def send(message: dict[str, object]) -> None:
+        """Capture response events in the order observed by the transport."""
+
         events.append(message)
 
     asyncio.run(
@@ -113,6 +121,8 @@ def test_complete_response_can_suppress_content_without_changing_metadata() -> N
     events: list[dict[str, object]] = []
 
     async def send(message: dict[str, object]) -> None:
+        """Capture emitted metadata and the suppressed terminal body."""
+
         events.append(message)
 
     asyncio.run(
@@ -144,6 +154,8 @@ def test_complete_response_suppresses_status_forbidden_content(status: int) -> N
     events: list[dict[str, object]] = []
 
     async def send(message: dict[str, object]) -> None:
+        """Capture the no-content response events for the selected status."""
+
         events.append(message)
 
     asyncio.run(
@@ -167,6 +179,8 @@ def test_complete_response_rejects_content_length_on_204_before_transport() -> N
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation for an invalid 204 framing field."""
+
         nonlocal calls
         calls += 1
 
@@ -205,6 +219,8 @@ def test_complete_response_rejects_inconsistent_content_length_before_transport(
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation for inconsistent explicit framing."""
+
         nonlocal calls
         calls += 1
 
@@ -242,6 +258,8 @@ def test_complete_response_accepts_consistent_content_length(
     events: list[dict[str, object]] = []
 
     async def send(message: dict[str, object]) -> None:
+        """Capture events emitted for consistent explicit Content-Length metadata."""
+
         events.append(message)
 
     asyncio.run(
@@ -265,6 +283,8 @@ def test_complete_response_rejects_duplicate_content_length_before_transport() -
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation for duplicate framing authority."""
+
         nonlocal calls
         calls += 1
 
@@ -287,6 +307,8 @@ def test_complete_response_rejects_non_boolean_suppression_before_transport() ->
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation for malformed suppression authority."""
+
         nonlocal calls
         calls += 1
 
@@ -311,6 +333,8 @@ def test_complete_response_does_not_attempt_body_after_start_failure() -> None:
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Raise the configured connection failure on the first transport call."""
+
         nonlocal calls
         calls += 1
         raise failure
@@ -336,6 +360,8 @@ def test_complete_response_preserves_terminal_body_send_failure() -> None:
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Fail only the terminal-body transport call after response-start succeeds."""
+
         nonlocal calls
         calls += 1
         if calls == 2:
