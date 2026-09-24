@@ -81,6 +81,10 @@ LEFT JOIN public.product_composition_recovery_attestation AS recovery_attestatio
 """.strip()
 
 
+class ServingEvidenceExpiredError(ActivationConflictError):
+    """Signal that otherwise-valid serving evidence expired at the database clock."""
+
+
 class RecoveredRouteSnapshot:
     """One recovery-commit-bound route projection for the then-current activation state."""
 
@@ -494,7 +498,7 @@ def current_route_ids_for_snapshot(
             "database wall clock moved behind recovery attestation"
         )
     if observed_at_unix_ms >= recovery_valid_until_unix_ms:
-        raise ActivationAuthorizationError(
+        raise ServingEvidenceExpiredError(
             "route snapshot recovery evidence expired before the serving decision"
         )
 
