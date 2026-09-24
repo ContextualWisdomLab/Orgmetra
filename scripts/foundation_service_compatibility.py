@@ -136,14 +136,22 @@ def discover_packages(root: Path) -> dict[str, ProjectMetadata]:
 
 
 def discover_services(root: Path) -> tuple[ProjectMetadata, ...]:
-    """Discover every owned service distribution without a service-name switchboard."""
-    services = tuple(
-        read_project(pyproject, require_layout=True)
-        for pyproject in sorted((root / "services").glob("*/pyproject.toml"))
-    )
+    """Discover uniquely identified owned services without a service-name switchboard."""
+    services: list[ProjectMetadata] = []
+    discovered: dict[str, ProjectMetadata] = {}
+    for pyproject in sorted((root / "services").glob("*/pyproject.toml")):
+        metadata = read_project(pyproject, require_layout=True)
+        prior = discovered.get(metadata.normalized_name)
+        if prior is not None:
+            raise ServiceCompatibilityError(
+                "duplicate owned service name after normalization: "
+                f"{prior.name!r} at {prior.path} and {metadata.name!r} at {metadata.path}"
+            )
+        discovered[metadata.normalized_name] = metadata
+        services.append(metadata)
     if not services:
         raise ServiceCompatibilityError("no owned service pyproject.toml files were discovered")
-    return services
+    return tuple(services)
 
 
 def _owned_requirement(
