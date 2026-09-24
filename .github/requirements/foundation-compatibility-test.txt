@@ -1,6 +1,6 @@
-# Reviewed Foundation compatibility toolchain for CPython 3.12-3.13 on GitHub-hosted Ubuntu x86_64.
-# Coverage wheel hashes are the reviewed CPython 3.12 and 3.13 manylinux x86_64 artifacts.
-coverage==7.14.2 --hash=sha256:8b4910cce599cd2438f8da65f5ef199a70a1cdb6ab314926df78271ca5954240 --hash=sha256:1d9a1b5813d00ea6151f6ccf64d1fa16892771dfdda12ba87162d15ec4ea3e1e
+# Reviewed Foundation compatibility toolchain for CPython 3.11-3.13 on GitHub-hosted Ubuntu x86_64.
+# Coverage wheel hashes are the reviewed CPython 3.11, 3.12, and 3.13 manylinux x86_64 artifacts.
+coverage==7.14.2 --hash=sha256:04cb445bed86aaf00aaa97d41a8b6e30f100f21e81c34caaec4efc684cb57768 --hash=sha256:8b4910cce599cd2438f8da65f5ef199a70a1cdb6ab314926df78271ca5954240 --hash=sha256:1d9a1b5813d00ea6151f6ccf64d1fa16892771dfdda12ba87162d15ec4ea3e1e
 iniconfig==2.3.0 --hash=sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12
 packaging==26.2 --hash=sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e
 pluggy==1.6.0 --hash=sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
