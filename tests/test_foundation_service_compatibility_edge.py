@@ -260,6 +260,25 @@ def test_main_reports_exact_runtime_execution(
     assert "executed=1 [orgmetra-sample-api]" in capsys.readouterr().out
 
 
+def test_main_can_require_non_vacuous_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Primary-runtime acceptance must fail when discovery executes no service."""
+
+    def fake_execute(root_path, runtime, *, runner=MODULE._run_pytest):
+        """Return an empty execution set without changing planner semantics."""
+        assert root_path == tmp_path.resolve()
+        assert runtime == Version(
+            f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        )
+        return ()
+
+    monkeypatch.setattr(MODULE, "execute_services", fake_execute)
+    with pytest.raises(MODULE.ServiceCompatibilityError, match="execution evidence would be vacuous"):
+        MODULE.main(["--root", str(tmp_path), "--require-execution"])
+
+
 def test_cli_guard_executes_main(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The executable script guard delegates to main rather than becoming dead code."""
     _write_project(
