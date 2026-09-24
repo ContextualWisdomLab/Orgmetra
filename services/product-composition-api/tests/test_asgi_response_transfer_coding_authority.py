@@ -16,6 +16,8 @@ def test_complete_response_rejects_application_transfer_encoding_before_transpor
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation for application-owned transfer coding."""
+
         nonlocal calls
         calls += 1
 
@@ -38,6 +40,8 @@ def test_complete_response_rejects_mixed_transfer_encoding_and_content_length() 
     calls = 0
 
     async def send(_: dict[str, object]) -> None:
+        """Count any transport invocation for mixed framing authorities."""
+
         nonlocal calls
         calls += 1
 
