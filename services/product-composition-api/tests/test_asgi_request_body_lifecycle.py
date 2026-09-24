@@ -234,25 +234,27 @@ def test_receive_result_must_be_awaitable_before_event_validation() -> None:
     assert receive.calls == 1
 
 
-def test_receive_invocation_exception_is_classified_as_capability_failure() -> None:
-    """Do not leak a synchronous callable failure before the receive result can prove awaitability."""
+def test_receive_preserves_synchronous_invocation_failure() -> None:
+    """Preserve a server failure raised before an awaitable exists instead of reclassifying it."""
+
+    failure = RuntimeError("synchronous receive server failure")
 
     class _RaisingSynchronousReceive:
-        """Raise before returning any object to model an invalid synchronous receive capability."""
+        """Raise before returning an awaitable to model a synchronous server/runtime failure."""
 
         def __init__(self) -> None:
-            """Track the single malformed capability invocation."""
+            """Track the single receive capability invocation."""
 
             self.calls = 0
 
         def __call__(self) -> object:
-            """Raise synchronously instead of returning the ASGI-required awaitable."""
+            """Raise the server/runtime failure without manufacturing capability evidence."""
 
             self.calls += 1
-            raise RuntimeError("raw synchronous receive failure")
+            raise failure
 
     receive = _RaisingSynchronousReceive()
-    with pytest.raises(CompositionRequestBodyError, match="invocation"):
+    with pytest.raises(RuntimeError) as caught:
         asyncio.run(
             read_bounded_http_request_body(
                 receive,  # type: ignore[arg-type]
@@ -260,7 +262,9 @@ def test_receive_invocation_exception_is_classified_as_capability_failure() -> N
                 max_receive_events=1,
             )
         )
+
     assert receive.calls == 1
+    assert caught.value is failure
 
 
 def test_receive_await_exception_remains_server_lifecycle_authority() -> None:
