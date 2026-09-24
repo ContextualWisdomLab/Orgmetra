@@ -132,11 +132,12 @@ def _require_complete_content_length(
 ) -> None:
     """Bind one explicit Content-Length to RFC 9110 final-response framing semantics."""
 
-    values = [
-        pair[1]
-        for pair in headers
-        if type(pair) in (list, tuple) and pair[0] == b"content-length"
-    ]
+    values: list[bytes] = []
+    for pair in headers:
+        header_pair = cast(list[bytes] | tuple[bytes, bytes], pair)
+        name, value = header_pair
+        if name == b"content-length":
+            values.append(value)
     if not values:
         return
     if len(values) != 1:
@@ -148,7 +149,7 @@ def _require_complete_content_length(
             "complete ASGI 204 response must not include content-length"
         )
 
-    value = cast(bytes, values[0])
+    value = values[0]
     if not value or not value.isdigit():
         raise CompositionResponseEventError(
             "complete ASGI response content-length must be one decimal byte string"
