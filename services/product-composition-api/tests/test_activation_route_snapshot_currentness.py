@@ -20,7 +20,10 @@ from orgmetra_product_composition import (
     configuration_sha256,
     current_route_ids_for_snapshot,
 )
-from orgmetra_product_composition.serving_snapshot import _issue_route_snapshot
+from orgmetra_product_composition.serving_snapshot import (
+    ServingEvidenceExpiredError,
+    _issue_route_snapshot,
+)
 
 
 class _Cursor:
@@ -209,12 +212,13 @@ def test_current_route_ids_reject_superseded_activation_sequence() -> None:
         current_route_ids_for_snapshot(registry, deployment, snapshot)
 
 
-def test_current_route_ids_reject_expired_recovery_evidence_at_database_clock() -> None:
+def test_current_route_ids_classify_expired_recovery_evidence_as_serving_liveness() -> None:
     deployment, snapshot = _snapshot()
     registry, _ = _registry(_current_row(snapshot, now_unix_ms=2_000))
 
-    with pytest.raises(ActivationAuthorizationError, match="expired"):
+    with pytest.raises(ServingEvidenceExpiredError, match="expired") as exc_info:
         current_route_ids_for_snapshot(registry, deployment, snapshot)
+    assert not isinstance(exc_info.value, ActivationAuthorizationError)
 
 
 def test_current_route_ids_reject_wrong_deployment_before_database_use() -> None:
