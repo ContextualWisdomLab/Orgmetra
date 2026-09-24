@@ -1,0 +1,189 @@
+from __future__ import annotations
+
+import asyncio
+
+import pytest
+
+from orgmetra_product_composition.asgi_response_send import (
+    CompositionResponseEventError,
+    send_complete_http_response,
+)
+
+
+def test_complete_response_prevalidates_entire_message_before_transport() -> None:
+    """Reject an invalid terminal body before response-start makes the response irreversible."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="response.body"):
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=200,
+                headers=((b"content-type", b"application/json"),),
+                body="not-bytes",
+            )
+        )
+
+    assert calls == 0
+
+
+def test_complete_response_rejects_informational_status_as_final_response() -> None:
+    """Keep informational status handling out of the terminal core-response completion path."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="final response status"):
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=103,
+                headers=(),
+                body=b"",
+            )
+        )
+
+    assert calls == 0
+
+
+def test_complete_response_sends_start_then_one_terminal_body() -> None:
+    """Emit exactly one response-start followed by one terminal response-body event."""
+
+    events: list[dict[str, object]] = []
+
+    async def send(message: dict[str, object]) -> None:
+        events.append(message)
+
+    asyncio.run(
+        send_complete_http_response(
+            send,
+            status=200,
+            headers=((b"content-type", b"application/json"),),
+            body=b'{"ok":true}',
+        )
+    )
+
+    assert events == [
+        {
+            "type": "http.response.start",
+            "status": 200,
+            "headers": [(b"content-type", b"application/json")],
+        },
+        {
+            "type": "http.response.body",
+            "body": b'{"ok":true}',
+            "more_body": False,
+        },
+    ]
+
+
+def test_complete_response_can_suppress_content_without_changing_metadata() -> None:
+    """Support HEAD-style content suppression while preserving the response-start metadata."""
+
+    events: list[dict[str, object]] = []
+
+    async def send(message: dict[str, object]) -> None:
+        events.append(message)
+
+    asyncio.run(
+        send_complete_http_response(
+            send,
+            status=404,
+            headers=((b"content-type", b"application/problem+json"),),
+            body=b'{"type":"about:blank"}',
+            suppress_body=True,
+        )
+    )
+
+    assert events[0] == {
+        "type": "http.response.start",
+        "status": 404,
+        "headers": [(b"content-type", b"application/problem+json")],
+    }
+    assert events[1] == {
+        "type": "http.response.body",
+        "body": b"",
+        "more_body": False,
+    }
+
+
+def test_complete_response_rejects_non_boolean_suppression_before_transport() -> None:
+    """Reject truthy lookalikes instead of letting caller state alter body semantics implicitly."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="suppress_body"):
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=200,
+                headers=(),
+                body=b"ok",
+                suppress_body=1,
+            )
+        )
+
+    assert calls == 0
+
+
+def test_complete_response_does_not_attempt_body_after_start_failure() -> None:
+    """Preserve the first server failure and do not continue a response whose start did not send."""
+
+    failure = BrokenPipeError("connection closed before response start")
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+        raise failure
+
+    with pytest.raises(BrokenPipeError) as caught:
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=503,
+                headers=(),
+                body=b"unavailable",
+            )
+        )
+
+    assert caught.value is failure
+    assert calls == 1
+
+
+def test_complete_response_preserves_terminal_body_send_failure() -> None:
+    """Expose a post-start transport failure without retrying or remapping the partial response."""
+
+    failure = ConnectionResetError("connection closed during body send")
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise failure
+
+    with pytest.raises(ConnectionResetError) as caught:
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=200,
+                headers=(),
+                body=b"ok",
+            )
+        )
+
+    assert caught.value is failure
+    assert calls == 2
