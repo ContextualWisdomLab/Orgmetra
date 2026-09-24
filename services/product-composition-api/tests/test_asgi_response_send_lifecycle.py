@@ -177,6 +177,40 @@ def test_asgi_send_rejects_malformed_or_unsupported_response_start_before_transp
     assert calls == 0
 
 
+@pytest.mark.parametrize("name", [b"", b"bad name", b"bad/name", b"bad\r\nname"])
+def test_asgi_send_rejects_invalid_http_field_name_before_transport(name: bytes) -> None:
+    """Require each outbound header field name to be a lowercase RFC 9110 token."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    event = {"type": "http.response.start", "status": 200, "headers": [(name, b"value")]}
+    with pytest.raises(CompositionResponseEventError, match="header names"):
+        asyncio.run(send_asgi_response_event(send, event))
+
+    assert calls == 0
+
+
+@pytest.mark.parametrize("value", [b"bad\rvalue", b"bad\nvalue", b"bad\x00value", b"bad\x01value"])
+def test_asgi_send_rejects_invalid_http_field_value_before_transport(value: bytes) -> None:
+    """Reject dangerous or invalid HTTP control octets before they reach an ASGI server."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    event = {"type": "http.response.start", "status": 200, "headers": [(b"x-name", value)]}
+    with pytest.raises(CompositionResponseEventError, match="header values"):
+        asyncio.run(send_asgi_response_event(send, event))
+
+    assert calls == 0
+
+
 @pytest.mark.parametrize(
     "event",
     [
