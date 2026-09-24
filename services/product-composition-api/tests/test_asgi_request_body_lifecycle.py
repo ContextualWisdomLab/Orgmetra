@@ -263,6 +263,27 @@ def test_receive_invocation_exception_is_classified_as_capability_failure() -> N
     assert receive.calls == 1
 
 
+def test_receive_await_exception_remains_server_lifecycle_authority() -> None:
+    """Do not reclassify an exception raised after a valid receive awaitable has been returned."""
+
+    class _FailingAsyncReceive:
+        """Return a valid coroutine whose execution fails at the await boundary."""
+
+        async def __call__(self) -> object:
+            """Raise only while the valid receive awaitable is executing."""
+
+            raise RuntimeError("await-side server failure")
+
+    with pytest.raises(RuntimeError, match="await-side server failure"):
+        asyncio.run(
+            read_bounded_http_request_body(
+                _FailingAsyncReceive(),
+                max_body_bytes=16,
+                max_receive_events=1,
+            )
+        )
+
+
 def test_receive_cancellation_propagates_without_timeout_reclassification() -> None:
     """Preserve task cancellation so callers can distinguish cancellation from protocol failure."""
 
