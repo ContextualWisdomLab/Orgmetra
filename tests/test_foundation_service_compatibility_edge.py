@@ -59,8 +59,16 @@ def _write_project(
             "project.name is required",
         ),
         (
+            "[project]\nname = \"_invalid\"\nversion = \"1.0.0\"\nrequires-python = \">=3.11\"\n",
+            "invalid project.name",
+        ),
+        (
             "[project]\nname = \"x\"\nversion = \"\"\nrequires-python = \">=3.11\"\n",
             "project.version is required",
+        ),
+        (
+            "[project]\nname = \"orgmetra-valid\"\nversion = \"french toast\"\nrequires-python = \">=3.11\"\n",
+            "invalid project.version",
         ),
         (
             "[project]\nname = \"x\"\nversion = \"1\"\nrequires-python = \"not a specifier\"\n",
