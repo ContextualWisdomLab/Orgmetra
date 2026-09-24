@@ -59,10 +59,10 @@ jobs:
       - name: Prove Foundation service discovery provenance
         run: |
           sha256sum --check <<'EOF'
-          928bb44a9bedb3c81c31871de17db15629d2d7f6e9f4b1f60f04b540d6a4721b  scripts/foundation_service_compatibility.py
+          e4e1afa821d7948db18a5936271a83d14056ea7e6d2bd08a0da6493f87138fde  scripts/foundation_service_compatibility.py
           4519385d85ba280f133a60b91afff24d6a242655df1f9666cded3a0b81e05a88  tests/test_foundation_service_compatibility.py
-          b7b84b838f5fbd0f7cb690255d628e450a1ffc32e7b25a2ed88616abb2502cbc  tests/test_foundation_service_compatibility_edge.py
-          fb00f474848e82a8fd827de083d4d14e81be4b001b7825e4a8654a68abbb7546  tests/test_foundation_service_workflow.py
+          056c0c3326a191cbd7b81e6baaf47b87f1400a9553526684094c5d60eb3fd1dc  tests/test_foundation_service_compatibility_edge.py
+          0f313fee99c2ca6988f7783a4e2315caa99f001a39d2d3fe38f0dda8bf1aef20  tests/test_foundation_service_workflow.py
           EOF
       - name: Prove Foundation service discovery contract
         run: |
@@ -87,7 +87,7 @@ jobs:
       - name: Run discovered service contracts on primary runtime
         env:
           ORGMETRA_PYTHON_MINOR: "3.14"
-        run: python scripts/foundation_service_compatibility.py
+        run: python scripts/foundation_service_compatibility.py --require-execution
       - name: Run PostgreSQL contracts in isolated containers
         env:
           PGPASSWORD: orgmetra
