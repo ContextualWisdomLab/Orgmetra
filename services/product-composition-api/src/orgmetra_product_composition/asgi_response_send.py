@@ -130,12 +130,16 @@ def _require_complete_content_length(
     headers: list[object],
     representation_body: bytes,
 ) -> None:
-    """Bind one explicit Content-Length to RFC 9110 final-response framing semantics."""
+    """Keep transfer coding server-owned and bind explicit Content-Length to final framing."""
 
     values: list[bytes] = []
     for pair in headers:
         header_pair = cast(list[bytes] | tuple[bytes, bytes], pair)
         name, value = header_pair
+        if name == b"transfer-encoding":
+            raise CompositionResponseEventError(
+                "complete ASGI response must not supply transfer-encoding; protocol server owns transfer coding"
+            )
         if name == b"content-length":
             values.append(value)
     if not values:
@@ -207,10 +211,12 @@ async def send_complete_http_response(
     invoked, so malformed caller-owned body material cannot be discovered only after response-start
     has made the response irreversible. ``suppress_body`` supports HEAD-style content suppression
     without changing representation metadata; RFC 9110 no-content statuses 204, 205, and 304
-    suppress representation bytes independently. An explicit Content-Length is accepted only when
-    it is unique and consistent with the selected representation, except that 204 forbids the field
-    and 205 can only describe the zero-octet response. The underlying representation body must still
-    be bytes so HEAD/304 metadata can be checked against the response this owner would otherwise send.
+    suppress representation bytes independently. Application-supplied ``Transfer-Encoding`` is
+    rejected because the ASGI protocol server owns outbound transfer coding. An explicit
+    Content-Length is accepted only when it is unique and consistent with the selected
+    representation, except that 204 forbids the field and 205 can only describe the zero-octet
+    response. The underlying representation body must still be bytes so HEAD/304 metadata can be
+    checked against the response this owner would otherwise send.
 
     Server/runtime failures raised while sending either event propagate unchanged. The helper does
     not retry, remap, or manufacture a second response after partial emission.
