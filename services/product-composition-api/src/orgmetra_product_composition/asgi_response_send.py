@@ -151,3 +151,52 @@ async def send_asgi_response_event(send: object, event: object) -> None:
     if not inspect.isawaitable(pending_send):
         raise CompositionResponseSendError("ASGI send result must be awaitable")
     await pending_send
+
+
+async def send_complete_http_response(
+    send: object,
+    *,
+    status: object,
+    headers: object,
+    body: object,
+    suppress_body: object = False,
+) -> None:
+    """Emit one final non-streaming HTTP response after validating both core events.
+
+    Informational 1xx messages are not terminal responses and remain outside this completion
+    boundary. Both response-start and terminal response-body are validated before ``send`` is
+    invoked, so malformed caller-owned body material cannot be discovered only after response-start
+    has made the response irreversible. ``suppress_body`` supports HEAD-style content suppression
+    without changing response metadata; the underlying representation body must still be bytes.
+
+    Server/runtime failures raised while sending either event propagate unchanged. The helper does
+    not retry, remap, or manufacture a second response after partial emission.
+    """
+
+    if type(status) is not int or not 200 <= status <= 599:
+        raise CompositionResponseEventError(
+            "complete ASGI final response status must be an integer HTTP status code from 200 to 599"
+        )
+    if type(suppress_body) is not bool:
+        raise CompositionResponseEventError(
+            "complete ASGI response suppress_body must be a boolean"
+        )
+    if type(body) is not bytes:
+        raise CompositionResponseEventError("ASGI http.response.body body must be bytes")
+
+    response_headers = list(headers) if type(headers) in (list, tuple) else headers
+    start_event: dict[str, object] = {
+        "type": "http.response.start",
+        "status": status,
+        "headers": response_headers,
+    }
+    body_event: dict[str, object] = {
+        "type": "http.response.body",
+        "body": b"" if suppress_body else body,
+        "more_body": False,
+    }
+
+    _require_core_http_response_event(start_event)
+    _require_core_http_response_event(body_event)
+    await send_asgi_response_event(send, start_event)
+    await send_asgi_response_event(send, body_event)
