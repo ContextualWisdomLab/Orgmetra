@@ -56,6 +56,15 @@ jobs:
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
+      - name: Prove Foundation service discovery contract
+        run: |
+          COVERAGE_FILE=/tmp/orgmetra-foundation-service-discovery.coverage \
+            python -m coverage run --branch --source=scripts -m pytest -q \
+              tests/test_foundation_service_compatibility.py \
+              tests/test_foundation_service_compatibility_edge.py \
+              tests/test_foundation_service_workflow.py
+          COVERAGE_FILE=/tmp/orgmetra-foundation-service-discovery.coverage \
+            python -m coverage report --include=scripts/foundation_service_compatibility.py --fail-under=100
       - name: Run owned package contracts once
         run: |
           set -euo pipefail
