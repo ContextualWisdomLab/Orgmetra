@@ -40,11 +40,13 @@ async def read_bounded_http_request_body(
     Both accumulated bytes and receive-event count are bounded: the event budget prevents an
     otherwise byte-bounded request from consuming unbounded CPU/list overhead through empty or
     tiny ``more_body=True`` chunks. Once the budget is spent, no additional ``receive()`` call is
-    made. The injected receive capability must also return an awaitable as ASGI requires; a plain
-    synchronous event is rejected as boundary misconfiguration rather than leaking Python's raw
-    ``TypeError``. ``http.disconnect`` remains a distinct lifecycle signal so a future host can
-    stop work instead of trying to serialize an HTTP error to a peer that is already gone. Task
-    cancellation is not caught here; caller/server cancellation therefore propagates unchanged.
+    made. The injected receive capability must return an awaitable as ASGI requires; a synchronous
+    invocation failure or plain synchronous event is rejected as boundary misconfiguration rather
+    than leaking the injected callable's raw exception or Python's ``TypeError``. Exceptions raised
+    while awaiting a valid receive result are not broadly caught. ``http.disconnect`` remains a
+    distinct lifecycle signal so a future host can stop work instead of trying to serialize an HTTP
+    error to a peer that is already gone. Task cancellation is not caught here; caller/server
+    cancellation therefore propagates unchanged.
     """
 
     if type(max_body_bytes) is not int or not 0 <= max_body_bytes <= _MAX_REQUEST_BODY_BYTES:
@@ -69,7 +71,12 @@ async def read_bounded_http_request_body(
             raise CompositionRequestBodyTooManyEventsError(
                 "ASGI HTTP request body exceeds the configured receive event limit"
             )
-        pending_event = receive()
+        try:
+            pending_event = receive()
+        except Exception as exc:
+            raise CompositionRequestBodyError(
+                "ASGI receive invocation must return an awaitable without synchronous failure"
+            ) from exc
         if not inspect.isawaitable(pending_event):
             raise CompositionRequestBodyError("ASGI receive result must be awaitable")
         event = await pending_event
