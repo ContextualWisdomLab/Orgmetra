@@ -137,6 +137,30 @@ def test_complete_response_can_suppress_content_without_changing_metadata() -> N
     }
 
 
+@pytest.mark.parametrize("status", [204, 205, 304])
+def test_complete_response_suppresses_status_forbidden_content(status: int) -> None:
+    """Do not put representation bytes on the wire when HTTP status semantics forbid content."""
+
+    events: list[dict[str, object]] = []
+
+    async def send(message: dict[str, object]) -> None:
+        events.append(message)
+
+    asyncio.run(
+        send_complete_http_response(
+            send,
+            status=status,
+            headers=(),
+            body=b"representation bytes",
+        )
+    )
+
+    assert events == [
+        {"type": "http.response.start", "status": status, "headers": []},
+        {"type": "http.response.body", "body": b"", "more_body": False},
+    ]
+
+
 def test_complete_response_rejects_non_boolean_suppression_before_transport() -> None:
     """Reject truthy lookalikes instead of letting caller state alter body semantics implicitly."""
 
