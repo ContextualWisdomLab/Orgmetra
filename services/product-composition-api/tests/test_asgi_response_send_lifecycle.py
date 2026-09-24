@@ -24,10 +24,10 @@ def test_asgi_send_rejects_non_callable_capability() -> None:
         asyncio.run(send_asgi_response_event(object(), _response_start_event()))
 
 
-def test_asgi_send_wraps_only_synchronous_invocation_failure() -> None:
-    """Classify non-lifecycle failure before an awaitable exists as invalid send capability shape."""
+def test_asgi_send_preserves_synchronous_invocation_failure() -> None:
+    """Preserve a server failure raised before an awaitable exists instead of reclassifying it."""
 
-    failure = RuntimeError("sync send failure")
+    failure = RuntimeError("sync server send failure")
     calls = 0
 
     def send(_: dict[str, object]) -> object:
@@ -35,11 +35,11 @@ def test_asgi_send_wraps_only_synchronous_invocation_failure() -> None:
         calls += 1
         raise failure
 
-    with pytest.raises(CompositionResponseSendError, match="invocation") as caught:
+    with pytest.raises(RuntimeError) as caught:
         asyncio.run(send_asgi_response_event(send, _response_start_event()))
 
     assert calls == 1
-    assert caught.value.__cause__ is failure
+    assert caught.value is failure
 
 
 def test_asgi_send_preserves_synchronous_closed_connection_oserror() -> None:
