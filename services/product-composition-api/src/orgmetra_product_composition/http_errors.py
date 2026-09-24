@@ -118,8 +118,9 @@ async def send_composition_error_response(
     The raw request method is required because malformed requests can fail before method
     canonicalization. Only an exact built-in ``HEAD`` value suppresses response content; every
     other value receives the mapped problem body so an invalid method can still get a useful 400.
-    Outbound ASGI capability-shape failures are rejected before await, while await-side server
-    lifecycle errors such as a closed-connection ``OSError`` and task cancellation propagate.
+    Demonstrably malformed outbound capability shape is rejected before await; exceptions raised
+    by invoking or awaiting a valid callable, including closed-connection ``OSError`` and task
+    cancellation, remain server/caller lifecycle authority and propagate unchanged.
     """
 
     response = http_response_for_composition_error(error)
