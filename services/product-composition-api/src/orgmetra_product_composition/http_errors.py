@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from typing import Awaitable, Callable
 
+from .asgi_response_send import AsgiSend, send_asgi_response_event
 from .request_routing import (
     CompositionMethodNotAllowedError,
     CompositionMethodNotImplementedError,
@@ -15,8 +15,6 @@ from .request_routing import (
     CompositionRoutingError,
     _require_method_rejection_authority,
 )
-
-AsgiSend = Callable[[dict[str, object]], Awaitable[None]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,22 +118,26 @@ async def send_composition_error_response(
     The raw request method is required because malformed requests can fail before method
     canonicalization. Only an exact built-in ``HEAD`` value suppresses response content; every
     other value receives the mapped problem body so an invalid method can still get a useful 400.
+    Outbound ASGI capability-shape failures are rejected before await, while await-side server
+    lifecycle errors such as a closed-connection ``OSError`` and task cancellation propagate.
     """
 
     response = http_response_for_composition_error(error)
-    await send(
+    await send_asgi_response_event(
+        send,
         {
             "type": "http.response.start",
             "status": response.status,
             "headers": list(response.headers),
-        }
+        },
     )
-    await send(
+    await send_asgi_response_event(
+        send,
         {
             "type": "http.response.body",
             "body": b""
             if type(request_method) is str and request_method == "HEAD"
             else response.body,
             "more_body": False,
-        }
+        },
     )
