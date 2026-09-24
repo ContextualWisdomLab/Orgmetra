@@ -19,7 +19,7 @@ def test_complete_response_prevalidates_entire_message_before_transport() -> Non
         nonlocal calls
         calls += 1
 
-    with pytest.raises(CompositionResponseEventError, match="response.body"):
+    with pytest.raises(CompositionResponseEventError, match=r"response\.body"):
         asyncio.run(
             send_complete_http_response(
                 send,
@@ -63,7 +63,7 @@ def test_complete_response_rejects_invalid_headers_before_transport() -> None:
         nonlocal calls
         calls += 1
 
-    with pytest.raises(CompositionResponseEventError, match="response.start headers"):
+    with pytest.raises(CompositionResponseEventError, match=r"response\.start headers"):
         asyncio.run(
             send_complete_http_response(
                 send,
@@ -170,7 +170,7 @@ def test_complete_response_rejects_content_length_on_204_before_transport() -> N
         nonlocal calls
         calls += 1
 
-    with pytest.raises(CompositionResponseEventError, match="204.*content-length"):
+    with pytest.raises(CompositionResponseEventError, match=r"204.*content-length"):
         asyncio.run(
             send_complete_http_response(
                 send,
