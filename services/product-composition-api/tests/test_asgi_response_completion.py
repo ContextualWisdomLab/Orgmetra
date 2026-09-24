@@ -161,6 +161,126 @@ def test_complete_response_suppresses_status_forbidden_content(status: int) -> N
     ]
 
 
+def test_complete_response_rejects_content_length_on_204_before_transport() -> None:
+    """Enforce the RFC 9110 prohibition on Content-Length in a 204 response."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="204.*content-length"):
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=204,
+                headers=((b"content-length", b"0"),),
+                body=b"",
+            )
+        )
+
+    assert calls == 0
+
+
+@pytest.mark.parametrize(
+    ("status", "suppress_body", "body", "content_length"),
+    [
+        (200, False, b"abc", b"2"),
+        (200, False, b"abc", b"x"),
+        (200, False, b"abc", b"3, 3"),
+        (200, True, b"abc", b"2"),
+        (304, False, b"abc", b"2"),
+        (205, False, b"abc", b"3"),
+    ],
+)
+def test_complete_response_rejects_inconsistent_content_length_before_transport(
+    status: int,
+    suppress_body: bool,
+    body: bytes,
+    content_length: bytes,
+) -> None:
+    """Fail closed when explicit Content-Length disagrees with the owned response semantics."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="content-length"):
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=status,
+                headers=((b"content-length", content_length),),
+                body=body,
+                suppress_body=suppress_body,
+            )
+        )
+
+    assert calls == 0
+
+
+@pytest.mark.parametrize(
+    ("status", "suppress_body", "body", "content_length"),
+    [
+        (200, False, b"abc", b"3"),
+        (200, True, b"abc", b"3"),
+        (304, False, b"abc", b"3"),
+        (205, False, b"abc", b"0"),
+    ],
+)
+def test_complete_response_accepts_consistent_content_length(
+    status: int,
+    suppress_body: bool,
+    body: bytes,
+    content_length: bytes,
+) -> None:
+    """Allow one canonical Content-Length when it matches representation or no-content semantics."""
+
+    events: list[dict[str, object]] = []
+
+    async def send(message: dict[str, object]) -> None:
+        events.append(message)
+
+    asyncio.run(
+        send_complete_http_response(
+            send,
+            status=status,
+            headers=((b"content-length", content_length),),
+            body=body,
+            suppress_body=suppress_body,
+        )
+    )
+
+    expected_wire_body = b"" if suppress_body or status in {205, 304} else body
+    assert events[0]["headers"] == [(b"content-length", content_length)]
+    assert events[1]["body"] == expected_wire_body
+
+
+def test_complete_response_rejects_duplicate_content_length_before_transport() -> None:
+    """Reject ambiguous duplicate Content-Length rather than normalize framing authority locally."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="content-length"):
+        asyncio.run(
+            send_complete_http_response(
+                send,
+                status=200,
+                headers=((b"content-length", b"3"), (b"content-length", b"3")),
+                body=b"abc",
+            )
+        )
+
+    assert calls == 0
+
+
 def test_complete_response_rejects_non_boolean_suppression_before_transport() -> None:
     """Reject truthy lookalikes instead of letting caller state alter body semantics implicitly."""
 
