@@ -268,11 +268,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run Foundation service discovery and compatibility acceptance."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path("."))
+    parser.add_argument(
+        "--require-execution",
+        action="store_true",
+        help="Fail when no discovered service supports the active runtime.",
+    )
     args = parser.parse_args(argv)
     runtime = Version(
         f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     )
     executed = execute_services(args.root.resolve(), runtime)
+    if args.require_execution and not executed:
+        raise ServiceCompatibilityError(
+            f"no owned service declared runtime {runtime}; execution evidence would be vacuous"
+        )
     print(
         f"Foundation service compatibility runtime={runtime}: "
         f"executed={len(executed)} [{', '.join(executed)}]"
