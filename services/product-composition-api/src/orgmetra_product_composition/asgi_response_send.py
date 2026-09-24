@@ -16,25 +16,18 @@ class CompositionResponseSendError(RuntimeError):
 async def send_asgi_response_event(send: object, event: dict[str, object]) -> None:
     """Send one caller-owned ASGI response event through a validated async capability.
 
-    Capability-shape failures that happen before an awaitable exists are local composition
-    configuration errors. A synchronous ``OSError`` is preserved because ASGI assigns a closed
-    connection send failure to that error family. Once an awaitable exists, all of its exceptions
-    remain server/caller lifecycle authority; in particular, closed-connection errors and task
-    cancellation propagate unchanged so the eventual host can stop work and clean up rather than
-    attempt to serialize a second response.
+    The boundary proves only capability shape: ``send`` must be callable and its normal return must
+    be awaitable. Exceptions raised by invoking a callable are not sufficient evidence of a local
+    configuration defect and therefore propagate unchanged, as do every exception and cancellation
+    raised while awaiting a valid result. This preserves ASGI server authority for closed-connection
+    ``OSError`` and other protocol/runtime failures while still rejecting demonstrably malformed
+    injected capabilities before awaiting them.
     """
 
     if not callable(send):
         raise CompositionResponseSendError("ASGI send must be callable")
     send_callable = cast(Callable[[dict[str, object]], object], send)
-    try:
-        pending_send = send_callable(event)
-    except OSError:
-        raise
-    except Exception as exc:
-        raise CompositionResponseSendError(
-            "ASGI send invocation must return an awaitable without synchronous failure"
-        ) from exc
+    pending_send = send_callable(event)
     if not inspect.isawaitable(pending_send):
         raise CompositionResponseSendError("ASGI send result must be awaitable")
     await pending_send
