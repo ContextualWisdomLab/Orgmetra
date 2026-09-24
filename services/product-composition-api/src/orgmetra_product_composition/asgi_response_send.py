@@ -40,11 +40,12 @@ def _require_http_field_value(value: bytes) -> None:
         )
 
 
-def _require_response_headers(headers: object) -> None:
-    """Validate the finite header representation used by this composition response boundary."""
+def _require_response_headers(headers: object) -> list[tuple[bytes, bytes]]:
+    """Validate response headers and detach them from caller-owned mutable pair containers."""
 
     if type(headers) not in (list, tuple):
         raise CompositionResponseEventError("ASGI http.response.start headers must be a list or tuple")
+    frozen_headers: list[tuple[bytes, bytes]] = []
     for pair in headers:
         if type(pair) not in (list, tuple):
             raise CompositionResponseEventError(
@@ -73,6 +74,8 @@ def _require_response_headers(headers: object) -> None:
             )
         _require_http_field_name(name)
         _require_http_field_value(value)
+        frozen_headers.append((name, value))
+    return frozen_headers
 
 
 def _require_response_start(event: dict[str, object]) -> None:
@@ -127,15 +130,13 @@ def _require_core_http_response_event(event: object) -> dict[str, object]:
 def _require_complete_content_length(
     *,
     status: int,
-    headers: list[object],
+    headers: list[tuple[bytes, bytes]],
     representation_body: bytes,
 ) -> None:
     """Keep transfer coding server-owned and bind explicit Content-Length to final framing."""
 
     values: list[bytes] = []
-    for pair in headers:
-        header_pair = cast(list[bytes] | tuple[bytes, bytes], pair)
-        name, value = header_pair
+    for name, value in headers:
         if name == b"transfer-encoding":
             raise CompositionResponseEventError(
                 "complete ASGI response must not supply transfer-encoding; protocol server owns transfer coding"
@@ -209,14 +210,16 @@ async def send_complete_http_response(
     Informational 1xx messages are not terminal responses and remain outside this completion
     boundary. Both response-start and terminal response-body are validated before ``send`` is
     invoked, so malformed caller-owned body material cannot be discovered only after response-start
-    has made the response irreversible. ``suppress_body`` supports HEAD-style content suppression
-    without changing representation metadata; RFC 9110 no-content statuses 204, 205, and 304
-    suppress representation bytes independently. Application-supplied ``Transfer-Encoding`` is
-    rejected because the ASGI protocol server owns outbound transfer coding. An explicit
-    Content-Length is accepted only when it is unique and consistent with the selected
-    representation, except that 204 forbids the field and 205 can only describe the zero-octet
-    response. The underlying representation body must still be bytes so HEAD/304 metadata can be
-    checked against the response this owner would otherwise send.
+    has made the response irreversible. Header names and values are copied into owned immutable
+    pairs before the first send so caller-held list aliases cannot rewrite already-validated wire
+    metadata while the transport awaitable is in flight. ``suppress_body`` supports HEAD-style
+    content suppression without changing representation metadata; RFC 9110 no-content statuses
+    204, 205, and 304 suppress representation bytes independently. Application-supplied
+    ``Transfer-Encoding`` is rejected because the ASGI protocol server owns outbound transfer
+    coding. An explicit Content-Length is accepted only when it is unique and consistent with the
+    selected representation, except that 204 forbids the field and 205 can only describe the
+    zero-octet response. The underlying representation body must still be bytes so HEAD/304
+    metadata can be checked against the response this owner would otherwise send.
 
     Server/runtime failures raised while sending either event propagate unchanged. The helper does
     not retry, remap, or manufacture a second response after partial emission.
@@ -233,7 +236,7 @@ async def send_complete_http_response(
     if type(body) is not bytes:
         raise CompositionResponseEventError("ASGI http.response.body body must be bytes")
 
-    response_headers = list(headers) if type(headers) in (list, tuple) else headers
+    response_headers = _require_response_headers(headers)
     start_event: dict[str, object] = {
         "type": "http.response.start",
         "status": status,
@@ -251,7 +254,7 @@ async def send_complete_http_response(
     _require_core_http_response_event(body_event)
     _require_complete_content_length(
         status=status,
-        headers=cast(list[object], response_headers),
+        headers=response_headers,
         representation_body=body,
     )
     await send_asgi_response_event(send, start_event)
