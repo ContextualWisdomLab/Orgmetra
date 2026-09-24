@@ -14,12 +14,16 @@ def test_complete_response_detaches_mutable_header_pairs_before_transport() -> N
     observed: list[dict[str, object]] = []
 
     async def send(message: dict[str, object]) -> None:
+        """Pause response-start so caller mutation occurs while transport is suspended."""
+
         if message["type"] == "http.response.start":
             first_send_started.set()
             await release_first_send.wait()
         observed.append(message)
 
     async def scenario() -> None:
+        """Mutate caller headers only after the validated response-start send begins."""
+
         response_task = asyncio.create_task(
             send_complete_http_response(
                 send,
