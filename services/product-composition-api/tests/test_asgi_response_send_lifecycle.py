@@ -13,9 +13,19 @@ from orgmetra_product_composition.asgi_response_send import (
 
 
 def _response_start_event() -> dict[str, object]:
-    """Return one inert ASGI response-start event for send-capability tests."""
+    """Return one valid ASGI response-start event for send-boundary tests."""
 
-    return {"type": "http.response.start", "status": 204, "headers": []}
+    return {
+        "type": "http.response.start",
+        "status": 204,
+        "headers": [(b"content-type", b"text/plain")],
+    }
+
+
+def _response_body_event() -> dict[str, object]:
+    """Return one valid ASGI response-body event for send-boundary tests."""
+
+    return {"type": "http.response.body", "body": b"", "more_body": False}
 
 
 def test_asgi_send_rejects_non_callable_capability() -> None:
@@ -132,16 +142,88 @@ def test_asgi_send_rejects_non_http_response_event_type_before_transport(event_t
     assert calls == 0
 
 
-@pytest.mark.parametrize("event_type", ["http.response.start", "http.response.body"])
-def test_asgi_send_accepts_core_http_response_event_types(event_type: str) -> None:
-    """Allow both core HTTP response message types through the validated send boundary."""
+@pytest.mark.parametrize(
+    "event",
+    [
+        {"type": "http.response.start"},
+        {"type": "http.response.start", "status": True},
+        {"type": "http.response.start", "status": 99},
+        {"type": "http.response.start", "status": 1000},
+        {"type": "http.response.start", "status": 200, "headers": "not-headers"},
+        {"type": "http.response.start", "status": 200, "headers": [b"not-a-pair"]},
+        {"type": "http.response.start", "status": 200, "headers": [(b"only-one",)]},
+        {"type": "http.response.start", "status": 200, "headers": [("x-name", b"value")]},
+        {"type": "http.response.start", "status": 200, "headers": [(b"x-name", "value")]},
+        {"type": "http.response.start", "status": 200, "headers": [(b"X-Name", b"value")]},
+        {"type": "http.response.start", "status": 200, "headers": [(b":status", b"200")]},
+        {"type": "http.response.start", "status": 200, "trailers": 1},
+        {"type": "http.response.start", "status": 200, "trailers": True},
+    ],
+)
+def test_asgi_send_rejects_malformed_or_unsupported_response_start_before_transport(
+    event: dict[str, object],
+) -> None:
+    """Reject invalid start metadata and trailer promises that this owner cannot complete."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="response.start"):
+        asyncio.run(send_asgi_response_event(send, event))
+
+    assert calls == 0
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        {"type": "http.response.body", "body": "not-bytes"},
+        {"type": "http.response.body", "more_body": 1},
+    ],
+)
+def test_asgi_send_rejects_malformed_response_body_before_transport(
+    event: dict[str, object],
+) -> None:
+    """Reject body fields whose runtime types violate the core ASGI HTTP contract."""
+
+    calls = 0
+
+    async def send(_: dict[str, object]) -> None:
+        nonlocal calls
+        calls += 1
+
+    with pytest.raises(CompositionResponseEventError, match="response.body"):
+        asyncio.run(send_asgi_response_event(send, event))
+
+    assert calls == 0
+
+
+@pytest.mark.parametrize("event", [_response_start_event(), _response_body_event()])
+def test_asgi_send_accepts_well_formed_core_http_response_events(event: dict[str, object]) -> None:
+    """Allow both well-formed core HTTP response message types through the validated boundary."""
 
     events: list[dict[str, object]] = []
 
-    async def send(event: dict[str, object]) -> None:
-        events.append(event)
+    async def send(message: dict[str, object]) -> None:
+        events.append(message)
 
-    event = {"type": event_type}
+    asyncio.run(send_asgi_response_event(send, event))
+
+    assert events == [event]
+
+
+def test_asgi_send_accepts_response_body_defaults() -> None:
+    """Preserve ASGI's empty-body and final-body defaults when optional body fields are omitted."""
+
+    events: list[dict[str, object]] = []
+
+    async def send(message: dict[str, object]) -> None:
+        events.append(message)
+
+    event = {"type": "http.response.body"}
     asyncio.run(send_asgi_response_event(send, event))
 
     assert events == [event]
