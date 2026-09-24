@@ -25,7 +25,7 @@ def test_asgi_send_rejects_non_callable_capability() -> None:
 
 
 def test_asgi_send_wraps_only_synchronous_invocation_failure() -> None:
-    """Classify failure before an awaitable exists as invalid injected send capability shape."""
+    """Classify non-lifecycle failure before an awaitable exists as invalid send capability shape."""
 
     failure = RuntimeError("sync send failure")
     calls = 0
@@ -40,6 +40,24 @@ def test_asgi_send_wraps_only_synchronous_invocation_failure() -> None:
 
     assert calls == 1
     assert caught.value.__cause__ is failure
+
+
+def test_asgi_send_preserves_synchronous_closed_connection_oserror() -> None:
+    """Preserve a server closed-connection OSError even when raised before an awaitable exists."""
+
+    closed = BrokenPipeError("peer closed before awaitable")
+    calls = 0
+
+    def send(_: dict[str, object]) -> object:
+        nonlocal calls
+        calls += 1
+        raise closed
+
+    with pytest.raises(BrokenPipeError) as caught:
+        asyncio.run(send_asgi_response_event(send, _response_start_event()))
+
+    assert calls == 1
+    assert caught.value is closed
 
 
 def test_asgi_send_rejects_non_awaitable_result() -> None:
