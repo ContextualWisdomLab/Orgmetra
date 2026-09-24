@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import subprocess
 import sys
 import tomllib
@@ -15,10 +14,8 @@ from typing import Callable, Sequence
 
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
-from packaging.version import Version
-
-
-_NORMALIZE_PROJECT_NAME_RE = re.compile(r"[-_.]+")
+from packaging.utils import InvalidName, canonicalize_name
+from packaging.version import InvalidVersion, Version
 
 
 class ServiceCompatibilityError(RuntimeError):
@@ -49,8 +46,8 @@ Runner = Callable[[ProjectMetadata, tuple[Path, ...]], None]
 
 
 def normalize_project_name(name: str) -> str:
-    """Normalize a Python distribution name according to PyPA name normalization."""
-    return _NORMALIZE_PROJECT_NAME_RE.sub("-", name).lower()
+    """Validate and normalize a Python distribution name with canonical PyPA rules."""
+    return str(canonicalize_name(name, validate=True))
 
 
 def _require_text(project: dict[str, object], key: str, path: Path) -> str:
@@ -93,6 +90,14 @@ def read_project(path: Path, *, require_layout: bool) -> ProjectMetadata:
     version = _require_text(project, "version", path)
     requires_python_text = _require_text(project, "requires-python", path)
     try:
+        normalized_name = normalize_project_name(name)
+    except InvalidName as exc:
+        raise ServiceCompatibilityError(f"{path}: invalid project.name {name!r}") from exc
+    try:
+        Version(version)
+    except InvalidVersion as exc:
+        raise ServiceCompatibilityError(f"{path}: invalid project.version {version!r}") from exc
+    try:
         requires_python = SpecifierSet(requires_python_text)
     except InvalidSpecifier as exc:
         raise ServiceCompatibilityError(
@@ -110,7 +115,7 @@ def read_project(path: Path, *, require_layout: bool) -> ProjectMetadata:
     return ProjectMetadata(
         path=path,
         name=name,
-        normalized_name=normalize_project_name(name),
+        normalized_name=normalized_name,
         version=version,
         requires_python=requires_python,
         dependencies=_read_requirements(project, path),
