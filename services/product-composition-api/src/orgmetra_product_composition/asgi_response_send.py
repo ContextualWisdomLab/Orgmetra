@@ -78,9 +78,9 @@ def _require_response_start(event: dict[str, object]) -> None:
     """Validate core response-start fields and reject trailer promises this owner cannot finish."""
 
     status = event.get("status")
-    if type(status) is not int or not 100 <= status <= 999:
+    if type(status) is not int or not 100 <= status <= 599:
         raise CompositionResponseEventError(
-            "ASGI http.response.start status must be an integer three-digit HTTP status code"
+            "ASGI http.response.start status must be an integer HTTP status code from 100 to 599"
         )
     _require_response_headers(event.get("headers", []))
     trailers = event.get("trailers", False)
@@ -128,11 +128,12 @@ async def send_asgi_response_event(send: object, event: object) -> None:
 
     The caller-owned event is validated before server invocation. This owner accepts only exact
     dictionaries for ``http.response.start`` and ``http.response.body`` and validates their core
-    ASGI field shapes. Header names are constrained to lowercased HTTP tokens and invalid control
-    octets are rejected from values before an HTTP implementation can parse them inconsistently.
-    A response-start trailer promise is rejected because this boundary does not yet own
-    ``http.response.trailers`` emission; extension or trailer support requires an explicit
-    scope-aware successor rather than silently widening this contract.
+    ASGI field shapes. Response status must remain in RFC 9110's valid 100..599 range. Header names
+    are constrained to lowercased HTTP tokens and invalid control octets are rejected from values
+    before an HTTP implementation can parse them inconsistently. A response-start trailer promise
+    is rejected because this boundary does not yet own ``http.response.trailers`` emission;
+    extension or trailer support requires an explicit scope-aware successor rather than silently
+    widening this contract.
 
     The injected ``send`` capability must be callable and its normal return must be awaitable.
     Exceptions raised by invoking a callable are not sufficient evidence of a local configuration
