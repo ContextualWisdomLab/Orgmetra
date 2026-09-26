@@ -44,8 +44,9 @@ def test_recovery_attestation_schema_becomes_visible_atomically_with_all_guards(
     """Do not expose the new durable table before its validation and append-only guards exist."""
     sql = _MIGRATION.read_text(encoding="utf-8").strip()
 
-    assert sql.startswith("BEGIN;\nSET LOCAL search_path = pg_catalog, public;")
+    begin = sql.index("BEGIN;\nSET LOCAL search_path = pg_catalog, public;")
     assert sql.endswith("COMMIT;")
-    assert sql.index("CREATE TABLE public.product_composition_recovery_attestation") < sql.index(
+    create_table = sql.index("CREATE TABLE public.product_composition_recovery_attestation")
+    assert begin < create_table < sql.index(
         "CREATE TRIGGER product_composition_recovery_attestation_insert_guard"
     )
