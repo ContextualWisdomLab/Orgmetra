@@ -62,6 +62,7 @@ def _routes(owner: OwnerApiRelease | None = None) -> tuple[CompositionRoute, ...
 def _generation(generation_id: str = "generation_one") -> CompositionGeneration:
     routes = _routes()
     return CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id=generation_id,
         routes=routes,
         config_sha256=configuration_sha256(routes),
@@ -166,7 +167,7 @@ def test_projection_revalidates_canonical_receipt_before_persistence() -> None:
     generation, receipt = _admitted_generation()
     object.__setattr__(receipt, "admitted_route_ids", ("people_get",))
 
-    with pytest.raises(CompositionContractError, match="canonical issuance state"):
+    with pytest.raises(CompositionContractError, match="not canonically issued"):
         GenerationRecordSet.from_admitted(generation, receipt)
 
 

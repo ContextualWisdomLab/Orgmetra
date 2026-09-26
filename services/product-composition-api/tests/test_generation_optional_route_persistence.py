@@ -44,6 +44,7 @@ def test_required_admission_can_persist_declared_optional_route_when_owner_is_un
         ),
     )
     generation = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id="generation_optional_owner_unavailable",
         routes=routes,
         config_sha256=configuration_sha256(routes),
