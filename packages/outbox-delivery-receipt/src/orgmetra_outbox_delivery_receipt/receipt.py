@@ -364,7 +364,7 @@ def _build_external_delivery_receipt_evidence_runtime():
         mutation_authority: object,
         next_action: object,
     ) -> ExternalDeliveryReceiptEvidence:
-        """Validate, detach, and seal one receipt with marker-last issuance."""
+        """Validate and detach one receipt before registering its exact identity."""
         if cls is not ExternalDeliveryReceiptEvidence:
             raise TypeError("ExternalDeliveryReceiptEvidence cannot be subclassed")
         frozen_transport_delivered_at = _freeze_timestamp(
