@@ -86,6 +86,7 @@ def _generation(generation_id: str = "generation_one") -> CompositionGeneration:
     )
     routes = (route,)
     return CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id=generation_id,
         routes=routes,
         config_sha256=configuration_sha256(routes),
