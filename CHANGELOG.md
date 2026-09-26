@@ -37,6 +37,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Product-composition request-routing fixtures now carry the required schema version so declaration, availability, and currentness behavior executes under the canonical generation contract.
 - Product-composition activation/currentness fixtures now carry the required schema version, migration tests validate semantic ordering after explanatory comments, and mutated nested deployment identities fail through the authorization boundary instead of leaking registry errors.
 - Product-composition generation-registry fixtures now supply the required schema version, and migration assertions follow schema-qualified durable object names without weakening append-only or truncate guards.
 - Consolidated repository-owned PR validation from twelve workflows into one Foundation CI job, while keeping the dual-cluster recovery rehearsal separately path-scoped. Central required review and security workflows remain organization-owned.
