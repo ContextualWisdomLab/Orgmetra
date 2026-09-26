@@ -34,6 +34,7 @@ def _generation() -> CompositionGeneration:
     )
     routes = (route,)
     return CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id="generation_one",
         routes=routes,
         config_sha256=configuration_sha256(routes),
@@ -129,5 +130,5 @@ def test_activation_migration_binds_evidence_to_event_kind_and_prior_sequence() 
 
     assert "authorization_action text NOT NULL" in migration
     assert "authorized_state_sequence bigint NOT NULL" in migration
-    assert "evidence.authorization_action IS DISTINCT FROM NEW.event_kind" in migration
-    assert "evidence.authorized_state_sequence IS DISTINCT FROM NEW.activation_sequence - 1" in migration
+    assert "evidence_authorization_action IS DISTINCT FROM NEW.event_kind" in migration
+    assert "evidence_authorized_state_sequence IS DISTINCT FROM NEW.activation_sequence - 1" in migration

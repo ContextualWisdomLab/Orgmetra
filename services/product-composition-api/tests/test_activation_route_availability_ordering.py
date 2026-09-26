@@ -62,6 +62,7 @@ def test_route_availability_uses_canonical_route_order_not_input_tuple_order() -
         ),
     )
     generation = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id="generation_reversed_routes",
         routes=routes,
         config_sha256=configuration_sha256(routes),

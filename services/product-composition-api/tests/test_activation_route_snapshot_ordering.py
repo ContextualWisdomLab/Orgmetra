@@ -65,6 +65,7 @@ def test_recovered_route_snapshot_uses_canonical_route_order_not_input_tuple_ord
         ),
     )
     generation = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id="generation_reversed_snapshot_routes",
         routes=routes,
         config_sha256=configuration_sha256(routes),
