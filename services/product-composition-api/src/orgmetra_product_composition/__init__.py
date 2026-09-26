@@ -34,6 +34,14 @@ from .registry import (
     RouteMethodRecord,
     RouteRecord,
 )
+from .request_routing import (
+    CompositionMethodNotAllowedError,
+    CompositionRequestError,
+    CompositionRouteNotFoundError,
+    CompositionRouteUnavailableError,
+    CompositionRoutingError,
+    current_route_id_for_request,
+)
 from .serving_snapshot import (
     RecoveredRouteSnapshot,
     current_route_ids_for_snapshot,
@@ -53,8 +61,13 @@ __all__ = [
     "AuthorizedRecoveredActivation",
     "CompositionContractError",
     "CompositionGeneration",
+    "CompositionMethodNotAllowedError",
     "CompositionRegistryError",
+    "CompositionRequestError",
     "CompositionRoute",
+    "CompositionRouteNotFoundError",
+    "CompositionRouteUnavailableError",
+    "CompositionRoutingError",
     "DeploymentIdentity",
     "GenerationRecordSet",
     "OwnerApiRelease",
@@ -68,6 +81,7 @@ __all__ = [
     "RouteRecord",
     "admit_generation",
     "configuration_sha256",
+    "current_route_id_for_request",
     "current_route_ids_for_snapshot",
     "recover_active_route_snapshot",
 ]
