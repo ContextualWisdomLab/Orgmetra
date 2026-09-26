@@ -42,7 +42,7 @@ class CompositionMethodNotImplementedError(CompositionRoutingError):
 class CompositionMethodNotAllowedError(CompositionRoutingError):
     """Raised with current methods when one selected Path Item rejects the request method."""
 
-    __slots__ = ("allowed_methods", "__weakref__")
+    __slots__ = ("allowed_methods",)
 
     def __init__(self, message: str, *, allowed_methods: tuple[object, ...]) -> None:
         """Issue one canonical Allow authority, including implicit HEAD parity for GET."""
