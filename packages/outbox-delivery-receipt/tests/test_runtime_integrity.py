@@ -81,6 +81,14 @@ def test_low_level_reconstruction_with_nonfrozen_timestamp_fails_closed() -> Non
         reconstructed.canonical_json()
 
 
+def test_public_receipt_is_not_reconstructable_through_tuple_new() -> None:
+    """Keep tuple allocation from bypassing the public receipt constructor."""
+    evidence = build_external_delivery_receipt_evidence(**_kwargs())
+
+    with pytest.raises(TypeError):
+        tuple.__new__(ExternalDeliveryReceiptEvidence, tuple(evidence))
+
+
 def test_exact_attempt_verification_rejects_receipt_subclasses() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
 
