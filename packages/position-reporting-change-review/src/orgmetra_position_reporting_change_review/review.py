@@ -244,6 +244,8 @@ class PositionReportingChangeReviewPacket:
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use the reviewed reporting-change vocabulary")
         _canonical_timestamp(self.recorded_at)
+        if self.recorded_at > datetime.now(timezone.utc):
+            raise ValueError("recorded_at must not be in the future")
         _validate_positive_int(self.evidence_version, "evidence_version")
         if self.contains_person_identifier is not False:
             raise ValueError("reporting-change evidence must not contain a person identifier")
