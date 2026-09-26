@@ -78,6 +78,10 @@ def test_builds_value_minimized_untrusted_transport_evidence() -> None:
     assert len(evidence.sha256_digest()) == 64
 
 
+def test_public_constructor_documents_fixed_safety_fields() -> None:
+    assert "fixed safety fields" in (ExternalDeliveryReceiptEvidence.__new__.__doc__ or "")
+
+
 def test_canonicalizes_aware_timestamps_to_utc_without_losing_precision() -> None:
     values = _kwargs()
     values["transport_delivered_at"] = datetime(
