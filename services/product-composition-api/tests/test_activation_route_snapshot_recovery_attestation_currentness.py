@@ -84,6 +84,7 @@ def _snapshot():
         required=True,
     )
     generation = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id="generation_serving_recovery_attestation",
         routes=(route,),
         config_sha256=configuration_sha256((route,)),
