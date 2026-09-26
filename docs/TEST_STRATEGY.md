@@ -40,6 +40,12 @@ The PostgreSQL scripts apply the checked-in migration chain required by the cont
 
 Future service packages must publish their exact test, statement-coverage, branch-coverage, docstring, typecheck, and build commands in the package manifest and CI log.
 
+### Active-PR service runtime compatibility
+
+PR #447 is active-PR test infrastructure, not shipped protected-`develop` truth. It discovers `services/*/pyproject.toml`, resolves each service's mandatory Orgmetra-owned dependency closure by PyPA-normalized distribution identity with exact canonical pins, and executes only services whose declared runtime and owned closure both admit the active interpreter. Foundation exercises the primary Python 3.14 runtime plus compatibility runtimes 3.11, 3.12, and 3.13; the primary lane must execute at least one service, while a compatibility lane may legitimately execute none after service metadata becomes truthful.
+
+The #447 base intentionally exposes a metadata RED: `job-analysis-api` and `people-api` still advertise Python 3.11 while mandatory `orgmetra-hris-kernel` / `orgmetra-keyverse-adapter` dependencies require Python 3.12 or newer, and the People service also carries a stale `orgmetra-hris-kernel` version pin. Those contradictions must fail closed until their canonical metadata owners (#305 for Job Analysis and #64 for People) integrate and #447 ordinary-forward reconciles them. Reordering or skipping the 3.11 check is not a substitute for repairing the declarations. Source-closure `PYTHONPATH` execution is service behavior evidence only; #261 separately owns installed wheel/sdist resolver acceptance.
+
 ## High-impact decision tests
 
 Required negative and provenance tests include:
@@ -53,7 +59,7 @@ Required negative and provenance tests include:
 - concurrent exact-key requests serialize at the persistence boundary and cannot commit two different identities;
 - previewed evidence versions must equal recorded evidence versions;
 - an open evidence set rejects a caller-supplied digest, preventing a client assertion from masquerading as database-observed membership;
-- finalizing a selection decision requires at least one versioned evidence member, computes the canonical SHA-256 digest in PostgreSQL, and seals exactly one evidence set in the same transaction;
+- finalizing a selection decision requires at least one versioned evidence member, computes the canonical SHA-256 evidence-set digest in PostgreSQL, and seals exactly one evidence set in the same transaction;
 - a membership write that acquired the evidence-set lock before finalization commits before the finalization snapshot is computed, and the resulting digest includes that member;
 - a sealed evidence set rejects later membership changes and cannot be reused by another decision;
 - a sealed evidence-set pointer must resolve back to the exact decision that consumed it;

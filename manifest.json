@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "27fd3f2a69181e6a31b49ab2a3d394bfc8dca2b8ef5e9ce39324273f7962773d",
-      "bytes": 11708,
-      "lines": 251
+      "sha256": "e39aa6b38c91c40544979120eb1fa0749e2d35d3e7dffd66b77675df3aebe61c",
+      "bytes": 13807,
+      "lines": 291
     },
     {
       "path": ".gitignore",
@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "1f86062a36c8adba25401b69df7bcac2c3dc049e048a0d4e88b18e9e08d14211",
+      "bytes": 18815,
+      "lines": 79
     },
     {
       "path": "CLAUDE.md",
@@ -185,9 +185,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d0a0bc3b54ed0fc7973747987f1afb117d6144c390b51ed9370eb571972a33f8",
-      "bytes": 16534,
-      "lines": 135
+      "sha256": "4288520176810d6ad4607bfad83f1f73c113e0c56b12cbac594ca54e7c90d4b7",
+      "bytes": 17916,
+      "lines": 141
     },
     {
       "path": "docs/THREAT_MODEL.md",
