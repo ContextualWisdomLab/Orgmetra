@@ -47,6 +47,7 @@ def _issued_snapshot():
         required=True,
     )
     generation = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id="generation_deployment_binding",
         routes=(route,),
         config_sha256=configuration_sha256((route,)),

@@ -156,9 +156,8 @@ def _project_route_snapshot(snapshot: RecoveredRouteSnapshot) -> tuple[object, .
 
     if type(event) is not ActivationEvent:
         raise ActivationAuthorizationError("route snapshot requires exact ActivationEvent")
-    ActivationEvent.__post_init__(event)
     try:
-        DeploymentIdentity.__post_init__(event.deployment)
+        ActivationEvent.__post_init__(event)
     except ActivationRegistryError as exc:
         raise ActivationAuthorizationError(
             "route snapshot DeploymentIdentity no longer matches its construction snapshot"
