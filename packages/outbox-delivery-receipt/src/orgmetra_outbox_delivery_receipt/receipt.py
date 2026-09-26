@@ -220,6 +220,7 @@ class ExternalDeliveryReceiptEvidence(_BaseReceipt):
         mutation_authority: str = _MUTATION_AUTHORITY,
         next_action: str = _NEXT_ACTION,
     ) -> "ExternalDeliveryReceiptEvidence":
+        """Build validated receipt evidence whose fixed safety fields callers cannot override."""
         frozen_transport_delivered_at = _freeze_timestamp(
             transport_delivered_at, "transport_delivered_at"
         )
