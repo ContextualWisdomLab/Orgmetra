@@ -10,13 +10,15 @@ remain later serving responsibilities.
 from __future__ import annotations
 
 import re
+from threading import RLock
+from weakref import WeakKeyDictionary
 
 from .activation import DeploymentIdentity
 from .activation_runtime_integrity import AuthorizedPostgresActivationRegistry
-from .admission import CompositionGeneration, CompositionRoute
+from .admission import CompositionGeneration, CompositionRoute, _ALLOWED_METHODS
 from .serving_snapshot import RecoveredRouteSnapshot, current_route_ids_for_snapshot
 
-_REQUEST_METHOD = re.compile(r"^[A-Z]{1,16}$")
+_REQUEST_METHOD = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
 _REQUEST_PATH = re.compile(r"^/v[0-9]+(?:/[A-Za-z0-9._:-]+)+$")
 _TEMPLATE_SEGMENT = re.compile(r"^\{[a-z][a-z0-9_]{0,63}\}$")
 
@@ -33,19 +35,87 @@ class CompositionRouteNotFoundError(CompositionRoutingError):
     """Raised when the active generation declares no Path Item for the request path."""
 
 
+class CompositionMethodNotImplementedError(CompositionRoutingError):
+    """Raised when a canonical method is outside the composition server's implemented profile."""
+
+
 class CompositionMethodNotAllowedError(CompositionRoutingError):
-    """Raised when the selected declared Path Item does not admit the request method."""
+    """Raised with current methods when one selected Path Item rejects the request method."""
+
+    __slots__ = ("allowed_methods",)
+
+    def __init__(self, message: str, *, allowed_methods: tuple[object, ...]) -> None:
+        """Issue one canonical Allow authority, including implicit HEAD parity for GET."""
+
+        if type(allowed_methods) is not tuple:
+            raise CompositionRoutingError("method rejection requires tuple Allow authority")
+        canonical_method_set = {
+            _canonical_request_method(method) for method in allowed_methods
+        }
+        if any(method not in _ALLOWED_METHODS for method in canonical_method_set):
+            raise CompositionRoutingError(
+                "method rejection Allow authority must use implemented composition methods"
+            )
+        if "GET" in canonical_method_set:
+            canonical_method_set.add("HEAD")
+        self.allowed_methods = tuple(sorted(canonical_method_set))
+        super().__init__(message)
+        _record_method_rejection_authority(self)
 
 
 class CompositionRouteUnavailableError(CompositionRoutingError):
     """Raised when the selected declared route lacks current positive availability evidence."""
 
 
+def _build_method_rejection_authority_runtime():
+    """Keep construction-time 405 authority outside mutable exception attributes."""
+
+    issued: WeakKeyDictionary[CompositionMethodNotAllowedError, tuple[str, ...]] = (
+        WeakKeyDictionary()
+    )
+    state_lock = RLock()
+    missing = object()
+
+    def record(error: CompositionMethodNotAllowedError) -> None:
+        """Record the one canonical method set issued with an error instance."""
+
+        with state_lock:
+            issued[error] = error.allowed_methods
+
+    def require(error: CompositionMethodNotAllowedError) -> tuple[str, ...]:
+        """Return issued authority only while public exception state still matches it."""
+
+        with state_lock:
+            canonical = issued.get(error, missing)
+            if canonical is missing:
+                raise CompositionRoutingError(
+                    "method rejection lacks construction-time Allow authority"
+                )
+            try:
+                current = error.allowed_methods
+            except AttributeError as exc:
+                raise CompositionRoutingError(
+                    "method rejection Allow authority is no longer available"
+                ) from exc
+            if current != canonical:
+                raise CompositionRoutingError(
+                    "method rejection Allow authority changed after construction"
+                )
+            return canonical
+
+    return record, require
+
+
+_record_method_rejection_authority, _require_method_rejection_authority = (
+    _build_method_rejection_authority_runtime()
+)
+
+
 def _canonical_request_method(method: object) -> str:
-    """Require one exact uppercase HTTP method token without inventing owner operations."""
+    """Require one exact RFC 9110 HTTP method token without inventing owner operations."""
 
     if type(method) is not str or _REQUEST_METHOD.fullmatch(method) is None:
-        raise CompositionRequestError("request method must be an exact uppercase HTTP token")
+        raise CompositionRequestError("request method must be an exact HTTP token")
     return method
 
 
@@ -96,6 +166,21 @@ def _selected_path_routes(
     raise CompositionRouteNotFoundError("active generation declares no route for request path")
 
 
+def _route_supports_request_method(route: CompositionRoute, method: str) -> bool:
+    """Treat HEAD as the metadata-only counterpart of a declared GET route."""
+
+    return method in route.methods or (method == "HEAD" and "GET" in route.methods)
+
+
+def _advertised_route_methods(route: CompositionRoute) -> frozenset[str]:
+    """Return current HTTP methods exposed by one route, including implicit HEAD for GET."""
+
+    methods = set(route.methods)
+    if "GET" in methods:
+        methods.add("HEAD")
+    return frozenset(methods)
+
+
 def current_route_id_for_request(
     registry: AuthorizedPostgresActivationRegistry,
     deployment: DeploymentIdentity,
@@ -106,25 +191,43 @@ def current_route_id_for_request(
 ) -> str:
     """Return the current stable route ID for one canonical request or fail closed.
 
-    Request syntax and declared path/method authority are resolved before PostgreSQL use. Only a
-    request that selects one admitted route crosses ``current_route_ids_for_snapshot`` for durable
-    activation/recovery currentness. Selection runs over the complete declared generation first,
-    applies concrete-before-template precedence, chooses only an explicitly declared method, and
-    checks positive route availability last. This ordering prevents both unnecessary durable-state
-    reads for unroutable requests and an unavailable optional concrete Path Item from widening into
-    a template route.
+    Request syntax and server method capability are resolved before declared Path Item selection.
+    HEAD shares GET route authority because RFC 9110 defines HEAD as GET without response content;
+    owner dispatch remains a later boundary. A selected path crosses ``current_route_ids_for_snapshot``
+    when needed either to advertise the resource's current RFC 9110 ``Allow`` authority or to prove
+    the requested route is serviceable. Selection runs over the complete declared generation first
+    and applies concrete-before-template precedence before availability is considered.
     """
 
     canonical_method = _canonical_request_method(method)
     canonical_path = _canonical_request_path(request_path)
+    if canonical_method not in _ALLOWED_METHODS:
+        raise CompositionMethodNotImplementedError(
+            "request method is outside the implemented composition HTTP profile"
+        )
+
     generation = snapshot.generation
     path_routes = _selected_path_routes(generation, canonical_path)
     method_routes = tuple(
-        route for route in path_routes if canonical_method in route.methods
+        route for route in path_routes if _route_supports_request_method(route, canonical_method)
     )
     if not method_routes:
+        available_route_ids = frozenset(
+            current_route_ids_for_snapshot(registry, deployment, snapshot)
+        )
+        allowed_methods = tuple(
+            sorted(
+                {
+                    method
+                    for route in path_routes
+                    if route.route_id in available_route_ids
+                    for method in _advertised_route_methods(route)
+                }
+            )
+        )
         raise CompositionMethodNotAllowedError(
-            "selected declared Path Item does not admit request method"
+            "selected declared Path Item does not admit request method",
+            allowed_methods=allowed_methods,
         )
     if len(method_routes) != 1:
         raise CompositionRoutingError(

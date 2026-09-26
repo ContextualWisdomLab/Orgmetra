@@ -261,7 +261,6 @@ def test_unknown_path_is_distinct_from_unavailable_declared_route() -> None:
 @pytest.mark.parametrize(
     ("method", "request_path"),
     [
-        ("get", "/v1/people/person_123"),
         ("GET", "/v1/people/../person_123"),
         ("GET", "/v1/people/person%2F123"),
         ("GET", "/v1/people/person_123?expand=job"),

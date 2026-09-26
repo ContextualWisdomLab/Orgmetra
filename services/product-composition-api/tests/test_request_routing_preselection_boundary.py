@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import orgmetra_product_composition.request_routing as request_routing
 from orgmetra_product_composition import (
     ActivationAdmissionEvidence,
     ActivationEvent,
@@ -9,6 +10,7 @@ from orgmetra_product_composition import (
     AuthorizedRecoveredActivation,
     CompositionGeneration,
     CompositionMethodNotAllowedError,
+    CompositionMethodNotImplementedError,
     CompositionRoute,
     CompositionRouteNotFoundError,
     DeploymentIdentity,
@@ -102,7 +104,7 @@ def _fixture():
 
     def connection_factory():
         raise AssertionError(
-            "declared path/method rejection must not cross the PostgreSQL currentness boundary"
+            "unknown paths and unimplemented methods must not cross PostgreSQL currentness"
         )
 
     def evidence_provider(*args):
@@ -132,10 +134,50 @@ def test_unknown_declared_path_is_rejected_before_postgres_currentness() -> None
         )
 
 
-def test_undeclared_method_is_rejected_before_postgres_currentness() -> None:
+def test_unimplemented_method_is_rejected_before_route_or_postgres_authority() -> None:
     registry, deployment, snapshot = _fixture()
 
-    with pytest.raises(CompositionMethodNotAllowedError):
+    with pytest.raises(CompositionMethodNotImplementedError):
+        current_route_id_for_request(
+            registry,
+            deployment,
+            snapshot,
+            method="CONNECT",
+            request_path="/v1/people/person_123",
+        )
+
+
+def test_head_uses_current_get_route_when_path_declares_get(monkeypatch) -> None:
+    registry, deployment, snapshot = _fixture()
+    calls: list[tuple[object, object, object]] = []
+
+    def current_routes(current_registry, current_deployment, current_snapshot):
+        calls.append((current_registry, current_deployment, current_snapshot))
+        return ("people_record",)
+
+    monkeypatch.setattr(request_routing, "current_route_ids_for_snapshot", current_routes)
+
+    assert current_route_id_for_request(
+        registry,
+        deployment,
+        snapshot,
+        method="HEAD",
+        request_path="/v1/people/person_123",
+    ) == "people_record"
+    assert calls == [(registry, deployment, snapshot)]
+
+
+def test_undeclared_method_uses_current_availability_for_allow(monkeypatch) -> None:
+    registry, deployment, snapshot = _fixture()
+    calls: list[tuple[object, object, object]] = []
+
+    def current_routes(current_registry, current_deployment, current_snapshot):
+        calls.append((current_registry, current_deployment, current_snapshot))
+        return ("people_record",)
+
+    monkeypatch.setattr(request_routing, "current_route_ids_for_snapshot", current_routes)
+
+    with pytest.raises(CompositionMethodNotAllowedError) as exc_info:
         current_route_id_for_request(
             registry,
             deployment,
@@ -143,3 +185,29 @@ def test_undeclared_method_is_rejected_before_postgres_currentness() -> None:
             method="POST",
             request_path="/v1/people/person_123",
         )
+
+    assert exc_info.value.allowed_methods == ("GET", "HEAD")
+    assert calls == [(registry, deployment, snapshot)]
+
+
+def test_undeclared_method_emits_empty_allow_when_resource_is_temporarily_disabled(
+    monkeypatch,
+) -> None:
+    registry, deployment, snapshot = _fixture()
+
+    monkeypatch.setattr(
+        request_routing,
+        "current_route_ids_for_snapshot",
+        lambda *_args: (),
+    )
+
+    with pytest.raises(CompositionMethodNotAllowedError) as exc_info:
+        current_route_id_for_request(
+            registry,
+            deployment,
+            snapshot,
+            method="POST",
+            request_path="/v1/people/person_123",
+        )
+
+    assert exc_info.value.allowed_methods == ()
