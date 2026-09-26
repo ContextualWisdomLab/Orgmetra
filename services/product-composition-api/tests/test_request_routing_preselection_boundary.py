@@ -5,6 +5,8 @@ import pytest
 import orgmetra_product_composition.request_routing as request_routing
 from orgmetra_product_composition import (
     ActivationAdmissionEvidence,
+    ActivationAuthorizationError,
+    ActivationConflictError,
     ActivationEvent,
     AuthorizedPostgresActivationRegistry,
     AuthorizedRecoveredActivation,
@@ -13,6 +15,7 @@ from orgmetra_product_composition import (
     CompositionMethodNotImplementedError,
     CompositionRoute,
     CompositionRouteNotFoundError,
+    CompositionRouteUnavailableError,
     DeploymentIdentity,
     OwnerApiRelease,
     OwnerOperationObservation,
@@ -211,3 +214,53 @@ def test_undeclared_method_emits_empty_allow_when_resource_is_temporarily_disabl
         )
 
     assert exc_info.value.allowed_methods == ()
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_superseded_serving_snapshot_is_route_unavailable_for_any_currentness_consumer(
+    monkeypatch,
+    method: str,
+) -> None:
+    """Classify durable snapshot supersession as ordinary request-time unavailability."""
+
+    registry, deployment, snapshot = _fixture()
+
+    def current_routes(*_args):
+        """Simulate the typed #437 supersession signal at the currentness boundary."""
+
+        raise ActivationConflictError("snapshot was superseded")
+
+    monkeypatch.setattr(request_routing, "current_route_ids_for_snapshot", current_routes)
+
+    with pytest.raises(CompositionRouteUnavailableError) as exc_info:
+        current_route_id_for_request(
+            registry,
+            deployment,
+            snapshot,
+            method=method,
+            request_path="/v1/people/person_123",
+        )
+
+    assert isinstance(exc_info.value.__cause__, ActivationConflictError)
+
+
+def test_serving_integrity_failure_is_not_laundered_as_route_unavailable(monkeypatch) -> None:
+    """Keep currentness integrity failures distinct from ordinary route unavailability."""
+
+    registry, deployment, snapshot = _fixture()
+
+    def current_routes(*_args):
+        """Simulate a typed integrity failure that the request adapter must not reclassify."""
+
+        raise ActivationAuthorizationError("serving authority integrity failed")
+
+    monkeypatch.setattr(request_routing, "current_route_ids_for_snapshot", current_routes)
+
+    with pytest.raises(ActivationAuthorizationError):
+        current_route_id_for_request(
+            registry,
+            deployment,
+            snapshot,
+            method="GET",
+            request_path="/v1/people/person_123",
+        )
