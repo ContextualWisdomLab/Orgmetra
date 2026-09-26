@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "08e1825c648010f14494e33fdadf90535fecd782385aec0041ad15e24d36e936",
-      "bytes": 18221,
-      "lines": 80
+      "sha256": "9cfb04550f80cbe3dcdee76cc90061641df4325353a3a5ddfc088285b3991024",
+      "bytes": 18531,
+      "lines": 81
     },
     {
       "path": "CLAUDE.md",
@@ -359,9 +359,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "9b03efbbdffa60a05f5924e8a61b1cbc3cd75c502df428a5920085e8d0bf3603",
-      "bytes": 28121,
-      "lines": 688
+      "sha256": "8527eb40faccea21b1789cf65f8ced3adda24edba81c9842488a32c5aff356ae",
+      "bytes": 28167,
+      "lines": 689
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -454,6 +454,12 @@
       "lines": 381
     },
     {
+      "path": "tests/test_repository_database_naming.py",
+      "sha256": "e97236bf13a83adf790124a7f5532709b2e784c145419a271469ad2ad7e2aeb8",
+      "bytes": 657,
+      "lines": 23
+    },
+    {
       "path": "tests/test_tenant_isolation_postgres.sh",
       "sha256": "dd649435ef8ab9e57f0609c101917e36656a6d40d63de9bcdbdac23d764f6c3a",
       "bytes": 15134,
@@ -467,9 +473,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "091836b2f68600a30b08f7da2cea8b3bef10201a123da720a7369bf10985eec2",
-      "bytes": 27237,
-      "lines": 637
+      "sha256": "1990d3fc23a2d5f1f0373a11fe3c61f0178653a5ce86508624f2e79be17ad646",
+      "bytes": 28128,
+      "lines": 661
     }
   ]
 }

@@ -37,6 +37,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Repository database validation now treats PostgreSQL's provided `public` schema as an external boundary and keeps the exact product-composition control-plane table set outside HR tenant/RLS rules, while continuing to enforce two-word lowercase `snake_case` names on Orgmetra-owned tables and custom schemas.
 - Product-composition request-routing fixtures now carry the required schema version so declaration, availability, and currentness behavior executes under the canonical generation contract.
 - Product-composition activation/currentness fixtures now carry the required schema version, migration tests validate semantic ordering after explanatory comments, and mutated nested deployment identities fail through the authorization boundary instead of leaking registry errors.
 - Product-composition generation-registry fixtures now supply the required schema version, and migration assertions follow schema-qualified durable object names without weakening append-only or truncate guards.
