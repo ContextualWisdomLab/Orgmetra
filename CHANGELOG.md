@@ -58,6 +58,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Security
 
+- Active-PR Foundation service execution strips ambient `PYTEST_*` and `COVERAGE_*` subprocess controls, disables pytest entry-point plugin autoload, and explicitly enables only the pinned `pytest-cov` plugin before setting the reviewed source closure and detached coverage file, so runner state cannot alter exact-candidate test selection, plugin loading, or coverage configuration.
 - Predictive-validity cases fail closed when selection evidence, Job scope, study criterion, converted worker, or system-recorded visibility does not match; the normalized case relation is tenant-qualified, append-only, TRUNCATE-protected, and forced through row-level security.
 - Purpose-bound PII authorization now fails closed across active tenant, authenticated actor tenant, resource tenant, resource kind, purpose, operation, operation-specific Keyverse scope, and requested-field subset; malformed/wildcard-like attributes, mutable field/scope collections, reserved UUID sentinels, and cross-tenant confused-deputy contexts are rejected before protected values are returned. Authorization requests and allow/deny evidence now also require and preserve one namespaced opaque target-resource reference, so immutable audit correlation identifies the exact HR record without copying its protected values. Authorization evidence otherwise contains governance metadata and field names only, with stable denial reasons and actionable next steps rather than PII.
 - LLM output constrained to draft evidence.

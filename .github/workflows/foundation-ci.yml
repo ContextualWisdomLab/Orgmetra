@@ -59,9 +59,9 @@ jobs:
       - name: Prove Foundation service discovery provenance
         run: |
           sha256sum --check <<'EOF'
-          2c77d3e87a3b2e627135fc23ee19baa02f76388250c54d47b5989a2a5469d0a8  scripts/foundation_service_compatibility.py
-          4519385d85ba280f133a60b91afff24d6a242655df1f9666cded3a0b81e05a88  tests/test_foundation_service_compatibility.py
-          fd462c091975b219b2ad64f19ffbbc8d26a759de871be810f663bc6ef7c65ea0  tests/test_foundation_service_compatibility_edge.py
+          d3abc7ef5bdfe216ecaa8e59c71853ac5591bff5bbc6ef71665115dfc213a82d  scripts/foundation_service_compatibility.py
+          874129dbf2d8471b9bf330b2e250248d2bd161062b0823b26cb5a4e69322dcec  tests/test_foundation_service_compatibility.py
+          6b0c3eb2a09f86b9cfc8e2889716250008ae6c92e6754cbeb05beaa3441fa553  tests/test_foundation_service_compatibility_edge.py
           fbae635cbb2aba13fc1eae9cf4492f87a913e13842ff7855356d22b7bf1584d4  tests/test_foundation_service_identity.py
           0f313fee99c2ca6988f7783a4e2315caa99f001a39d2d3fe38f0dda8bf1aef20  tests/test_foundation_service_workflow.py
           EOF

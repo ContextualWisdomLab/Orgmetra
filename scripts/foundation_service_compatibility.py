@@ -242,9 +242,14 @@ def plan_service_executions(
 
 
 def _run_pytest(service: ProjectMetadata, source_paths: tuple[Path, ...]) -> None:
-    """Execute one service's own pytest configuration under an isolated coverage file."""
+    """Execute one service with reviewed plugin authority and isolated coverage."""
     tests_dir = service.path.parent / "tests"
-    env = os.environ.copy()
+    env = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith(("PYTEST_", "COVERAGE_"))
+    }
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     env["PYTHONPATH"] = os.pathsep.join(str(path) for path in source_paths)
     env["COVERAGE_FILE"] = (
         f"/tmp/orgmetra-{service.path.parent.name}-"
@@ -255,6 +260,8 @@ def _run_pytest(service: ProjectMetadata, source_paths: tuple[Path, ...]) -> Non
             sys.executable,
             "-m",
             "pytest",
+            "-p",
+            "pytest_cov.plugin",
             "-c",
             str(service.path),
             str(tests_dir),

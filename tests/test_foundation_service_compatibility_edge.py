@@ -236,6 +236,8 @@ def test_run_pytest_uses_service_config_and_detached_coverage_file(
         sys.executable,
         "-m",
         "pytest",
+        "-p",
+        "pytest_cov.plugin",
         "-c",
         str(pyproject),
         str(pyproject.parent / "tests"),
@@ -243,6 +245,45 @@ def test_run_pytest_uses_service_config_and_detached_coverage_file(
     assert captured["check"] is True
     assert captured["env"]["PYTHONPATH"] == str(pyproject.parent / "src")
     assert "orgmetra-sample-api" in captured["env"]["COVERAGE_FILE"]
+
+
+def test_run_pytest_scrubs_ambient_pytest_and_coverage_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only reviewed pytest and coverage controls reach service execution."""
+    pyproject = _write_project(
+        tmp_path,
+        "services/sample-api",
+        name="orgmetra-sample-api",
+        version="1.0.0",
+        requires_python=">=3.11",
+        service=True,
+    )
+    service = MODULE.read_project(pyproject, require_layout=True)
+    captured: dict[str, object] = {}
+    for variable_name in (
+        "PYTEST_ADDOPTS",
+        "PYTEST_PLUGINS",
+        "COVERAGE_PROCESS_START",
+        "COVERAGE_RCFILE",
+    ):
+        monkeypatch.setenv(variable_name, "ambient-authority")
+
+    def fake_run(command, *, check, env):
+        """Capture subprocess authority without launching pytest."""
+        captured["env"] = env
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    MODULE._run_pytest(service, (pyproject.parent / "src",))
+
+    child_env = captured["env"]
+    assert {
+        name for name in child_env if name.startswith("PYTEST_")
+    } == {"PYTEST_DISABLE_PLUGIN_AUTOLOAD"}
+    assert child_env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] == "1"
+    assert {
+        name for name in child_env if name.startswith("COVERAGE_")
+    } == {"COVERAGE_FILE"}
 
 
 def test_main_reports_exact_runtime_execution(
