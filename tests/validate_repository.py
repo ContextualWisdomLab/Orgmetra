@@ -91,6 +91,7 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_repository_database_naming.py",
     "tests/validate_repository.py",
 ]
 
@@ -100,6 +101,18 @@ UNFINISHED_MARKER_LINE_PATTERN = re.compile(
     r"<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$",
     flags=re.IGNORECASE,
 )
+
+NON_TENANT_CONTROL_PLANE_TABLES = {
+    "product_composition_activation_event",
+    "product_composition_activation_evidence",
+    "product_composition_activation_owner_observation",
+    "product_composition_deployment",
+    "product_composition_generation",
+    "product_composition_owner_release",
+    "product_composition_recovery_attestation",
+    "product_composition_route",
+    "product_composition_route_method",
+}
 
 
 def _fail(message: str) -> None:
@@ -226,7 +239,11 @@ def _validate_database_contract() -> None:
         _fail("No CREATE TABLE statement found")
 
     for match in matches:
-        for identifier in filter(None, (match.group("schema"), match.group("table"))):
+        schema_identifier = match.group("schema")
+        owned_identifiers = [match.group("table")]
+        if schema_identifier not in (None, "public"):
+            owned_identifiers.append(schema_identifier)
+        for identifier in owned_identifiers:
             if "_" not in identifier or identifier != identifier.lower():
                 _fail(
                     "Database object name is not two-word lowercase snake_case: "
@@ -368,10 +385,15 @@ def _validate_database_contract() -> None:
         if fragment not in sql:
             _fail(f"Missing database contract fragment: {fragment}")
 
-    tenant_matches = [match for match in matches if match.group("table") != "tenant_record"]
+    tenant_matches = [
+        match
+        for match in matches
+        if match.group("table") != "tenant_record"
+        and match.group("table") not in NON_TENANT_CONTROL_PLANE_TABLES
+    ]
     for index, match in enumerate(matches):
         table_name = match.group("table")
-        if table_name == "tenant_record":
+        if table_name == "tenant_record" or table_name in NON_TENANT_CONTROL_PLANE_TABLES:
             continue
         block_start = match.start()
         next_match_index = index + 1
@@ -382,7 +404,9 @@ def _validate_database_contract() -> None:
         if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in sql:
             _fail(f"Forced row-level security is missing from table: {table_name}")
 
-    if len(tenant_matches) != len(matches) - 1:
+    if len(tenant_matches) != len(matches) - 1 - len(
+        {match.group("table") for match in matches} & NON_TENANT_CONTROL_PLANE_TABLES
+    ):
         _fail("Tenant-scoped table discovery is internally inconsistent")
 
 
