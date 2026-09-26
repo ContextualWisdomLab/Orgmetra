@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 
-from .asgi_response_send import AsgiSend, send_asgi_response_event
+from .asgi_response_send import AsgiSend, send_complete_http_response
 from .request_routing import (
     CompositionMethodNotAllowedError,
     CompositionMethodNotImplementedError,
@@ -118,27 +118,17 @@ async def send_composition_error_response(
     The raw request method is required because malformed requests can fail before method
     canonicalization. Only an exact built-in ``HEAD`` value suppresses response content; every
     other value receives the mapped problem body so an invalid method can still get a useful 400.
-    Demonstrably malformed outbound capability shape is rejected before await; exceptions raised
-    by invoking or awaiting a valid callable, including closed-connection ``OSError`` and task
-    cancellation, remain server/caller lifecycle authority and propagate unchanged.
+    The complete response is structurally prevalidated before response-start is sent. Demonstrably
+    malformed outbound capability shape is rejected before await; exceptions raised by invoking or
+    awaiting a valid callable, including closed-connection ``OSError`` and task cancellation, remain
+    server/caller lifecycle authority and propagate unchanged.
     """
 
     response = http_response_for_composition_error(error)
-    await send_asgi_response_event(
+    await send_complete_http_response(
         send,
-        {
-            "type": "http.response.start",
-            "status": response.status,
-            "headers": list(response.headers),
-        },
-    )
-    await send_asgi_response_event(
-        send,
-        {
-            "type": "http.response.body",
-            "body": b""
-            if type(request_method) is str and request_method == "HEAD"
-            else response.body,
-            "more_body": False,
-        },
+        status=response.status,
+        headers=response.headers,
+        body=response.body,
+        suppress_body=type(request_method) is str and request_method == "HEAD",
     )

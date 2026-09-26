@@ -11,6 +11,7 @@ _CORE_HTTP_RESPONSE_EVENT_TYPES = frozenset({"http.response.start", "http.respon
 _HTTP_FIELD_NAME_OCTETS = frozenset(
     b"!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyz"
 )
+_NO_CONTENT_FINAL_STATUSES = frozenset({204, 205, 304})
 
 
 class CompositionResponseEventError(ValueError):
@@ -39,11 +40,12 @@ def _require_http_field_value(value: bytes) -> None:
         )
 
 
-def _require_response_headers(headers: object) -> None:
-    """Validate the finite header representation used by this composition response boundary."""
+def _require_response_headers(headers: object) -> list[tuple[bytes, bytes]]:
+    """Validate response headers and detach them from caller-owned mutable pair containers."""
 
     if type(headers) not in (list, tuple):
         raise CompositionResponseEventError("ASGI http.response.start headers must be a list or tuple")
+    frozen_headers: list[tuple[bytes, bytes]] = []
     for pair in headers:
         if type(pair) not in (list, tuple):
             raise CompositionResponseEventError(
@@ -72,6 +74,8 @@ def _require_response_headers(headers: object) -> None:
             )
         _require_http_field_name(name)
         _require_http_field_value(value)
+        frozen_headers.append((name, value))
+    return frozen_headers
 
 
 def _require_response_start(event: dict[str, object]) -> None:
@@ -123,6 +127,46 @@ def _require_core_http_response_event(event: object) -> dict[str, object]:
     return response_event
 
 
+def _require_complete_content_length(
+    *,
+    status: int,
+    headers: list[tuple[bytes, bytes]],
+    representation_body: bytes,
+) -> None:
+    """Keep transfer coding server-owned and bind explicit Content-Length to final framing."""
+
+    values: list[bytes] = []
+    for name, value in headers:
+        if name == b"transfer-encoding":
+            raise CompositionResponseEventError(
+                "complete ASGI response must not supply transfer-encoding; protocol server owns transfer coding"
+            )
+        if name == b"content-length":
+            values.append(value)
+    if not values:
+        return
+    if len(values) != 1:
+        raise CompositionResponseEventError(
+            "complete ASGI response content-length must appear at most once"
+        )
+    if status == 204:
+        raise CompositionResponseEventError(
+            "complete ASGI 204 response must not include content-length"
+        )
+
+    value = values[0]
+    if not value or not value.isdigit():
+        raise CompositionResponseEventError(
+            "complete ASGI response content-length must be one decimal byte string"
+        )
+    normalized_value = value.lstrip(b"0") or b"0"
+    expected_octets = 0 if status == 205 else len(representation_body)
+    if normalized_value != str(expected_octets).encode("ascii"):
+        raise CompositionResponseEventError(
+            "complete ASGI response content-length does not match response semantics"
+        )
+
+
 async def send_asgi_response_event(send: object, event: object) -> None:
     """Send one validated core HTTP response event without reclassifying server failures.
 
@@ -151,3 +195,67 @@ async def send_asgi_response_event(send: object, event: object) -> None:
     if not inspect.isawaitable(pending_send):
         raise CompositionResponseSendError("ASGI send result must be awaitable")
     await pending_send
+
+
+async def send_complete_http_response(
+    send: object,
+    *,
+    status: object,
+    headers: object,
+    body: object,
+    suppress_body: object = False,
+) -> None:
+    """Emit one final non-streaming HTTP response after validating both core events.
+
+    Informational 1xx messages are not terminal responses and remain outside this completion
+    boundary. Both response-start and terminal response-body are validated before ``send`` is
+    invoked, so malformed caller-owned body material cannot be discovered only after response-start
+    has made the response irreversible. Header names and values are copied into owned immutable
+    pairs before the first send so caller-held list aliases cannot rewrite already-validated wire
+    metadata while the transport awaitable is in flight. ``suppress_body`` supports HEAD-style
+    content suppression without changing representation metadata; RFC 9110 no-content statuses
+    204, 205, and 304 suppress representation bytes independently. Application-supplied
+    ``Transfer-Encoding`` is rejected because the ASGI protocol server owns outbound transfer
+    coding. An explicit Content-Length is accepted only when it is unique and consistent with the
+    selected representation, except that 204 forbids the field and 205 can only describe the
+    zero-octet response. The underlying representation body must still be bytes so HEAD/304
+    metadata can be checked against the response this owner would otherwise send.
+
+    Server/runtime failures raised while sending either event propagate unchanged. The helper does
+    not retry, remap, or manufacture a second response after partial emission.
+    """
+
+    if type(status) is not int or not 200 <= status <= 599:
+        raise CompositionResponseEventError(
+            "complete ASGI final response status must be an integer HTTP status code from 200 to 599"
+        )
+    if type(suppress_body) is not bool:
+        raise CompositionResponseEventError(
+            "complete ASGI response suppress_body must be a boolean"
+        )
+    if type(body) is not bytes:
+        raise CompositionResponseEventError("ASGI http.response.body body must be bytes")
+
+    response_headers = _require_response_headers(headers)
+    start_event: dict[str, object] = {
+        "type": "http.response.start",
+        "status": status,
+        "headers": response_headers,
+    }
+    body_event: dict[str, object] = {
+        "type": "http.response.body",
+        "body": b""
+        if suppress_body or status in _NO_CONTENT_FINAL_STATUSES
+        else body,
+        "more_body": False,
+    }
+
+    _require_core_http_response_event(start_event)
+    _require_core_http_response_event(body_event)
+    _require_complete_content_length(
+        status=status,
+        headers=response_headers,
+        representation_body=body,
+    )
+    await send_asgi_response_event(send, start_event)
+    await send_asgi_response_event(send, body_event)
