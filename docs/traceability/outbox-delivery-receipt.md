@@ -1,6 +1,6 @@
 # External delivery receipt traceability
 
-**State:** Active PR #151 only. Protected `develop` does not yet expose this package.
+**State:** Active successor PR #448 carries PR #151. Protected `develop` does not yet expose this package.
 
 | Requirement | Executable evidence | Production boundary |
 | --- | --- | --- |
@@ -15,7 +15,7 @@
 | Retry replay cannot cross attempt boundaries | exact-attempt mismatch regression | `delivery_attempt_count` in reconciliation tuple |
 | Copy/low-level reconstruction cannot bypass fixed safety/trust invariants | `test_copy_bypass_cannot_create_a_second_canonical_truth` | canonical export revalidation |
 | Structural mutation is rejected | `test_evidence_is_structurally_immutable_after_construction` | tuple-backed evidence type |
-| Exact owned statement/branch coverage | hosted `Outbox Delivery Receipt Quality` | pytest-cov gate at 100% |
+| Exact owned statement/branch coverage | canonical hosted `Foundation CI` package command | pytest-cov gate at 100% |
 
 ## Upstream protected-main truth
 
@@ -23,7 +23,7 @@
   durable outbox state.
 - `database/migrations/0005_outbox_delivery_finalization.sql` owns live-lease completion
   and retry mutation.
-- This PR does not change either migration and does not claim a durable receipt column.
+- This successor does not change either migration and does not claim a durable receipt column.
 
 ## Downstream acceptance
 
