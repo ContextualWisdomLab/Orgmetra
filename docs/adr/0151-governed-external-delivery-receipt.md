@@ -1,6 +1,6 @@
 # ADR 0151: Govern external transport delivery receipt evidence before outbox completion
 
-- **Status:** Proposed — active PR #151; not protected-main truth
+- **Status:** Proposed — active successor PR #448 carrying PR #151; not protected-main truth
 - **Date:** 2026-08-29
 - **Owners:** Orgmetra integration/audit boundary
 - **Decision scope:** Evidence needed between an external transport response and an
