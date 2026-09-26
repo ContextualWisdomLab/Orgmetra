@@ -44,10 +44,11 @@ not caller-defined subclasses whose equality or serialization behavior can be ov
 Caller-owned aware datetimes are normalized once during construction into detached,
 built-in UTC `datetime` values before the evidence object retains them. Later changes to a
 caller-owned timezone provider therefore cannot rewrite the canonical JSON or digest.
-Canonical export rejects low-level reconstructed evidence unless both stored timestamps
-are already those frozen built-in UTC values. Exact-attempt verification likewise accepts
-only the exact `ExternalDeliveryReceiptEvidence` type so a subclass cannot override the
-returned digest or other trust behavior.
+Every low-level reconstructed instance is rejected because it has no exact issued identity
+in the closure-private registry. Canonical export accepts only registry-owned frozen
+built-in UTC timestamps. Exact-attempt verification likewise accepts only the exact
+`ExternalDeliveryReceiptEvidence` type so a subclass cannot override the returned digest
+or other trust behavior.
 
 This value-object boundary is not cryptographic secrecy against arbitrary same-process
 reflection, bytecode rewriting, debugger access, or native-memory access. The host must
