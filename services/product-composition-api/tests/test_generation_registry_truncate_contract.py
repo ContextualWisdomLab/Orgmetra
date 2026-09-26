@@ -16,6 +16,6 @@ def test_generation_registry_blocks_truncate_on_every_durable_table() -> None:
         "product_composition_route_method",
     ):
         assert f"CREATE TRIGGER {table}_truncate_guard" in migration
-        assert f"BEFORE TRUNCATE ON {table}" in migration
+        assert f"BEFORE TRUNCATE ON public.{table}" in migration
 
     assert "reject_product_composition_generation_registry_truncate" in migration

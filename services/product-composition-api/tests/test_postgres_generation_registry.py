@@ -96,6 +96,7 @@ def _records(generation_id: str = "generation_one") -> GenerationRecordSet:
         ),
     )
     generation = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id=generation_id,
         routes=routes,
         config_sha256=configuration_sha256(routes),
@@ -242,7 +243,7 @@ def test_migration_defines_append_only_normalized_registry() -> None:
         "product_composition_route",
         "product_composition_route_method",
     ):
-        assert f"CREATE TABLE {table}" in migration
+        assert f"CREATE TABLE public.{table}" in migration
         assert f"CREATE TRIGGER {table}_append_only_guard" in migration
 
     assert "FOREIGN KEY (generation_id, owner_service_id)" in migration
