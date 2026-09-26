@@ -97,6 +97,29 @@ def test_low_level_allocation_with_wrong_marker_fails_closed() -> None:
         _ = reconstructed.tenant_record_id
 
 
+def test_issued_marker_cannot_be_cloned_into_a_forged_receipt() -> None:
+    issued = build_external_delivery_receipt_evidence(**_kwargs())
+    forged_values = list(object.__getattribute__(issued, "_field_values"))
+    forged_values[11] = True
+    forged = object.__new__(ExternalDeliveryReceiptEvidence)
+    object.__setattr__(forged, "_field_values", tuple(forged_values))
+    object.__setattr__(
+        forged,
+        "_issuance_marker",
+        object.__getattribute__(issued, "_issuance_marker"),
+    )
+
+    with pytest.raises(ValueError, match="validated constructor"):
+        _ = forged.contains_hr_payload
+
+
+def test_issued_receipt_has_no_replaceable_internal_value_slot() -> None:
+    evidence = build_external_delivery_receipt_evidence(**_kwargs())
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(evidence, "_field_values", ())
+
+
 def test_public_receipt_is_not_reconstructable_through_tuple_new() -> None:
     """Keep tuple allocation from bypassing the public receipt constructor."""
     with pytest.raises(TypeError):
