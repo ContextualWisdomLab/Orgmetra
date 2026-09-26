@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Integrate package verification into canonical Foundation CI rather than a leaf-owned workflow.
+- Document the public receipt constructor and its non-overridable fixed safety fields.
 - Define value-minimized external transport delivery receipt evidence.
 - Bind receipts to an exact tenant/outbox/audit/target/attempt coordinate.
 - Keep transport evidence untrusted and explicitly non-authorizing for delivery-state
