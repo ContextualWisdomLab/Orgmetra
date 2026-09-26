@@ -83,6 +83,7 @@ def _issued_snapshot() -> tuple[DeploymentIdentity, object]:
         required=True,
     )
     generation = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
         generation_id="generation_serving_use_boundary",
         routes=(route,),
         config_sha256=configuration_sha256((route,)),
@@ -138,6 +139,8 @@ def test_serving_currentness_pins_validated_deployment_coordinates_across_connec
     deployment, snapshot = _issued_snapshot()
     original_coordinates = (deployment.deployment_id, deployment.environment_id)
     event = snapshot.event
+    recovery_sequence = snapshot.recovery_sequence
+    evidence_digest = snapshot.evidence.bundle_sha256()
     cursor = _Cursor(
         (
             event.activation_sequence,
@@ -145,9 +148,9 @@ def test_serving_currentness_pins_validated_deployment_coordinates_across_connec
             event.previous_generation_id,
             event.event_kind,
             event.evidence_bundle_sha256,
-            snapshot.recovery_sequence,
-            snapshot.evidence.bundle_sha256(),
-            snapshot.recovery_sequence,
+            recovery_sequence,
+            evidence_digest,
+            recovery_sequence,
             1_250,
             1_500,
             False,
@@ -177,6 +180,6 @@ def test_serving_currentness_pins_validated_deployment_coordinates_across_connec
     assert len(cursor.executions) == 1
     assert cursor.executions[0][1] == (
         *original_coordinates,
-        snapshot.recovery_sequence,
-        snapshot.evidence.bundle_sha256(),
+        recovery_sequence,
+        evidence_digest,
     )
