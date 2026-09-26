@@ -78,6 +78,20 @@ def test_builds_value_minimized_untrusted_transport_evidence() -> None:
     assert len(evidence.sha256_digest()) == 64
 
 
+def test_preserves_value_equality_and_hashing_after_sealing() -> None:
+    values = _kwargs()
+    first = build_external_delivery_receipt_evidence(**values)
+    equivalent = build_external_delivery_receipt_evidence(**values)
+    changed_values = dict(values)
+    changed_values["delivery_attempt_count"] = 3
+    different = build_external_delivery_receipt_evidence(**changed_values)
+
+    assert first == equivalent
+    assert hash(first) == hash(equivalent)
+    assert first != different
+    assert first != object()
+
+
 def test_public_constructor_documents_fixed_safety_fields() -> None:
     assert "fixed safety fields" in (ExternalDeliveryReceiptEvidence.__new__.__doc__ or "")
 
