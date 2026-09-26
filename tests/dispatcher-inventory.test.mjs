@@ -22,13 +22,23 @@ function pythonRequiredFiles() {
   return new Set([...match[1].matchAll(/^\s+"([^"]+)",$/gm)].map((item) => item[1]));
 }
 
-test('every migration and executable PostgreSQL contract is provenance-required', () => {
+test('PostgreSQL execution inventory is not duplicated in language-specific switchboards', () => {
   const nodeRequired = new Set(REQUIRED_FILES);
   const pythonRequired = pythonRequiredFiles();
   const executionFiles = discoveredExecutionFiles();
   assert.ok(executionFiles.length > 0, 'execution inventory discovery returned no files');
   for (const filePath of executionFiles) {
-    assert.equal(nodeRequired.has(filePath), true, `Node inventory omitted ${filePath}`);
-    assert.equal(pythonRequired.has(filePath), true, `Python inventory omitted ${filePath}`);
+    assert.equal(nodeRequired.has(filePath), false, `Node switchboard still owns ${filePath}`);
+    assert.equal(pythonRequired.has(filePath), false, `Python switchboard still owns ${filePath}`);
   }
+});
+
+test('local validation invokes the canonical PostgreSQL registry', () => {
+  const packageDocument = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+  );
+  assert.match(
+    packageDocument.scripts.validate,
+    /python3 \.github\/scripts\/foundation-postgres-contracts\.py validate/,
+  );
 });
