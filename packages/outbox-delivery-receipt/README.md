@@ -33,12 +33,15 @@ lease, authorization, audit, and persistence checks.
 
 ## Integrity model
 
-The public evidence type is a tuple-backed immutable value. Ordinary mutation through
-`setattr` or `object.__setattr__` fails. Canonical export also revalidates every
-trust-bearing field, so copy helpers or low-level tuple construction cannot bypass the
-fixed safety-state, shape, chronology, or identifier invariants. A separately constructed
-receipt is still untrusted evidence and must independently match the authoritative exact
-attempt plus the external receipt artifact before any governed completion can occur.
+The public evidence type is a sealed non-tuple immutable value. Its validated constructor
+stores detached fields before applying a closure-private marker; every public field read
+verifies that marker. Raw `object.__new__` allocations remain unusable, while
+`tuple.__new__` cannot allocate the type at all. Ordinary mutation and deletion fail, and
+canonical export revalidates every trust-bearing field so low-level state replacement
+cannot bypass the fixed safety-state, shape, chronology, or identifier invariants. A
+separately constructed receipt is still untrusted evidence and must independently match
+the authoritative exact attempt plus the external receipt artifact before any governed
+completion can occur.
 
 This is an application evidence contract, not a digital-signature scheme. Durable
 cross-process authenticity and retention belong to the authoritative persistence and

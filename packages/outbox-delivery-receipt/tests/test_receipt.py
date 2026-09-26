@@ -285,18 +285,15 @@ def test_fixed_safety_contract_cannot_be_overridden(field_name: str, bad_value: 
 def test_evidence_is_structurally_immutable_after_construction() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
     with pytest.raises(AttributeError):
-        object.__setattr__(evidence, "delivery_attempt_count", 99)
+        evidence.delivery_attempt_count = 99
+    with pytest.raises(AttributeError):
+        del evidence.delivery_attempt_count
 
 
-def test_copy_bypass_cannot_create_a_second_canonical_truth() -> None:
+def test_tuple_copy_bypass_surface_is_absent() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
 
-    replaced = evidence._replace(trust_state="trusted_transport_evidence")
-    with pytest.raises(ValueError, match="trust_state"):
-        replaced.canonical_json()
-
-    raw_values = list(evidence)
-    raw_values[11] = True
-    reconstructed = tuple.__new__(ExternalDeliveryReceiptEvidence, tuple(raw_values))
-    with pytest.raises(ValueError, match="contains_hr_payload"):
-        reconstructed.sha256_digest()
+    with pytest.raises(AttributeError):
+        evidence._replace(trust_state="trusted_transport_evidence")
+    with pytest.raises(TypeError):
+        tuple.__new__(ExternalDeliveryReceiptEvidence, ())

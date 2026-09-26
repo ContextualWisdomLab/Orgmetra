@@ -13,6 +13,8 @@ The contract therefore:
 - rejects noncanonical/sentinel UUID identities, malformed governance codes, non-UUIDv4
   normalized receipt references, invalid digests, unbounded attempt/version values, and
   impossible observation chronology;
+- issues a sealed non-tuple value only after validation, so raw object allocation and
+  tuple reconstruction cannot expose forged public receipt fields;
 - revalidates trust-bearing fields on canonical export to catch copy/bypass-created
   instances; and
 - never grants authority to mutate `outbox_delivery_record`.

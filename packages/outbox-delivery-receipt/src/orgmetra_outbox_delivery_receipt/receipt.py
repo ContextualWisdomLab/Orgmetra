@@ -7,7 +7,6 @@ it can consider a separately governed completion transaction.
 """
 from __future__ import annotations
 
-from collections import namedtuple
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -166,36 +165,36 @@ def _validate_contract(
     return transport_delivered_at_utc, observed_at_utc
 
 
-_BaseReceipt = namedtuple(
-    "_BaseReceipt",
-    [
-        "tenant_record_id",
-        "outbox_delivery_record_id",
-        "audit_event_record_id",
-        "delivery_target_code",
-        "delivery_attempt_count",
-        "transport_provider_code",
-        "transport_receipt_reference",
-        "transport_receipt_digest",
-        "transport_delivered_at",
-        "observed_at",
-        "evidence_version",
-        "contains_hr_payload",
-        "contains_destination",
-        "contains_credentials",
-        "delivery_outcome_code",
-        "trust_state",
-        "reconciliation_state",
-        "mutation_authority",
-        "next_action",
-    ],
+_RECEIPT_FIELD_NAMES = (
+    "tenant_record_id",
+    "outbox_delivery_record_id",
+    "audit_event_record_id",
+    "delivery_target_code",
+    "delivery_attempt_count",
+    "transport_provider_code",
+    "transport_receipt_reference",
+    "transport_receipt_digest",
+    "transport_delivered_at",
+    "observed_at",
+    "evidence_version",
+    "contains_hr_payload",
+    "contains_destination",
+    "contains_credentials",
+    "delivery_outcome_code",
+    "trust_state",
+    "reconciliation_state",
+    "mutation_authority",
+    "next_action",
 )
+_RECEIPT_FIELD_INDEX = {
+    field_name: field_index for field_index, field_name in enumerate(_RECEIPT_FIELD_NAMES)
+}
 
 
-class ExternalDeliveryReceiptEvidence(_BaseReceipt):
-    """Structurally immutable evidence that an external transport reported delivery."""
+class ExternalDeliveryReceiptEvidence:
+    """Sealed immutable evidence that an external transport reported delivery."""
 
-    __slots__ = ()
+    __slots__ = ("_field_values", "_issuance_marker")
 
     def __new__(
         cls,
@@ -221,11 +220,8 @@ class ExternalDeliveryReceiptEvidence(_BaseReceipt):
         next_action: str = _NEXT_ACTION,
     ) -> "ExternalDeliveryReceiptEvidence":
         """Build validated receipt evidence whose fixed safety fields callers cannot override."""
-        frozen_transport_delivered_at = _freeze_timestamp(
-            transport_delivered_at, "transport_delivered_at"
-        )
-        frozen_observed_at = _freeze_timestamp(observed_at, "observed_at")
-        _validate_contract(
+        return _construct_external_delivery_receipt_evidence(
+            cls=cls,
             tenant_record_id=tenant_record_id,
             outbox_delivery_record_id=outbox_delivery_record_id,
             audit_event_record_id=audit_event_record_id,
@@ -234,8 +230,8 @@ class ExternalDeliveryReceiptEvidence(_BaseReceipt):
             transport_provider_code=transport_provider_code,
             transport_receipt_reference=transport_receipt_reference,
             transport_receipt_digest=transport_receipt_digest,
-            transport_delivered_at=frozen_transport_delivered_at,
-            observed_at=frozen_observed_at,
+            transport_delivered_at=transport_delivered_at,
+            observed_at=observed_at,
             evidence_version=evidence_version,
             contains_hr_payload=contains_hr_payload,
             contains_destination=contains_destination,
@@ -247,29 +243,22 @@ class ExternalDeliveryReceiptEvidence(_BaseReceipt):
             next_action=next_action,
         )
 
-        instance = super().__new__(
-            cls,
-            tenant_record_id,
-            outbox_delivery_record_id,
-            audit_event_record_id,
-            delivery_target_code,
-            delivery_attempt_count,
-            transport_provider_code,
-            transport_receipt_reference,
-            transport_receipt_digest,
-            frozen_transport_delivered_at,
-            frozen_observed_at,
-            evidence_version,
-            contains_hr_payload,
-            contains_destination,
-            contains_credentials,
-            delivery_outcome_code,
-            trust_state,
-            reconciliation_state,
-            mutation_authority,
-            next_action,
-        )
-        return instance
+    def __getattribute__(self, name: str) -> object:
+        """Expose receipt fields only after verifying closure-private issuance."""
+        field_index = _RECEIPT_FIELD_INDEX.get(name)
+        if field_index is not None:
+            _require_external_delivery_receipt_evidence_issued(self)
+            values = object.__getattribute__(self, "_field_values")
+            return values[field_index]
+        return object.__getattribute__(self, name)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """Reject mutation of issued receipt evidence."""
+        raise AttributeError("ExternalDeliveryReceiptEvidence is immutable")
+
+    def __delattr__(self, name: str) -> None:
+        """Reject deletion of issued receipt evidence."""
+        raise AttributeError("ExternalDeliveryReceiptEvidence is immutable")
 
     def __repr__(self) -> str:
         """Redact correlation identifiers from routine logs."""
@@ -334,6 +323,108 @@ class ExternalDeliveryReceiptEvidence(_BaseReceipt):
     def sha256_digest(self) -> str:
         """Return SHA-256 over the exact canonical UTF-8 receipt evidence."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
+def _build_external_delivery_receipt_evidence_runtime():
+    """Create closure-private issuance state for validated receipt evidence."""
+    issuance_marker = object()
+
+    def require_issued(evidence: ExternalDeliveryReceiptEvidence) -> None:
+        """Reject raw allocations that did not pass the validated constructor."""
+        try:
+            marker = object.__getattribute__(evidence, "_issuance_marker")
+        except AttributeError as exc:
+            raise ValueError(
+                "receipt evidence was not issued by the validated constructor"
+            ) from exc
+        if marker is not issuance_marker:
+            raise ValueError("receipt evidence was not issued by the validated constructor")
+
+    def construct(
+        *,
+        cls: type[ExternalDeliveryReceiptEvidence],
+        tenant_record_id: object,
+        outbox_delivery_record_id: object,
+        audit_event_record_id: object,
+        delivery_target_code: object,
+        delivery_attempt_count: object,
+        transport_provider_code: object,
+        transport_receipt_reference: object,
+        transport_receipt_digest: object,
+        transport_delivered_at: object,
+        observed_at: object,
+        evidence_version: object,
+        contains_hr_payload: object,
+        contains_destination: object,
+        contains_credentials: object,
+        delivery_outcome_code: object,
+        trust_state: object,
+        reconciliation_state: object,
+        mutation_authority: object,
+        next_action: object,
+    ) -> ExternalDeliveryReceiptEvidence:
+        """Validate, detach, and seal one receipt with marker-last issuance."""
+        if cls is not ExternalDeliveryReceiptEvidence:
+            raise TypeError("ExternalDeliveryReceiptEvidence cannot be subclassed")
+        frozen_transport_delivered_at = _freeze_timestamp(
+            transport_delivered_at, "transport_delivered_at"
+        )
+        frozen_observed_at = _freeze_timestamp(observed_at, "observed_at")
+        _validate_contract(
+            tenant_record_id=tenant_record_id,
+            outbox_delivery_record_id=outbox_delivery_record_id,
+            audit_event_record_id=audit_event_record_id,
+            delivery_target_code=delivery_target_code,
+            delivery_attempt_count=delivery_attempt_count,
+            transport_provider_code=transport_provider_code,
+            transport_receipt_reference=transport_receipt_reference,
+            transport_receipt_digest=transport_receipt_digest,
+            transport_delivered_at=frozen_transport_delivered_at,
+            observed_at=frozen_observed_at,
+            evidence_version=evidence_version,
+            contains_hr_payload=contains_hr_payload,
+            contains_destination=contains_destination,
+            contains_credentials=contains_credentials,
+            delivery_outcome_code=delivery_outcome_code,
+            trust_state=trust_state,
+            reconciliation_state=reconciliation_state,
+            mutation_authority=mutation_authority,
+            next_action=next_action,
+        )
+        values = (
+            tenant_record_id,
+            outbox_delivery_record_id,
+            audit_event_record_id,
+            delivery_target_code,
+            delivery_attempt_count,
+            transport_provider_code,
+            transport_receipt_reference,
+            transport_receipt_digest,
+            frozen_transport_delivered_at,
+            frozen_observed_at,
+            evidence_version,
+            contains_hr_payload,
+            contains_destination,
+            contains_credentials,
+            delivery_outcome_code,
+            trust_state,
+            reconciliation_state,
+            mutation_authority,
+            next_action,
+        )
+        evidence = object.__new__(ExternalDeliveryReceiptEvidence)
+        object.__setattr__(evidence, "_field_values", values)
+        object.__setattr__(evidence, "_issuance_marker", issuance_marker)
+        return evidence
+
+    return require_issued, construct
+
+
+(
+    _require_external_delivery_receipt_evidence_issued,
+    _construct_external_delivery_receipt_evidence,
+) = _build_external_delivery_receipt_evidence_runtime()
+del _build_external_delivery_receipt_evidence_runtime
 
 
 def build_external_delivery_receipt_evidence(

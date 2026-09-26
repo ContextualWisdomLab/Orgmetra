@@ -70,23 +70,37 @@ def test_timezone_provider_without_offset_fails_closed() -> None:
 
 
 def test_low_level_reconstruction_with_nonfrozen_timestamp_fails_closed() -> None:
+    reconstructed = object.__new__(ExternalDeliveryReceiptEvidence)
+    object.__setattr__(reconstructed, "_field_values", ())
+
+    with pytest.raises(ValueError, match="validated constructor"):
+        reconstructed.canonical_json()
+
+
+def test_low_level_timestamp_replacement_fails_closed() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
-    raw_values = list(evidence)
+    raw_values = list(object.__getattribute__(evidence, "_field_values"))
     raw_values[8] = datetime(
         2026, 8, 29, 10, 2, 3, tzinfo=timezone(timedelta(hours=9))
     )
-    reconstructed = tuple.__new__(ExternalDeliveryReceiptEvidence, tuple(raw_values))
+    object.__setattr__(evidence, "_field_values", tuple(raw_values))
 
     with pytest.raises(ValueError, match="transport_delivered_at"):
-        reconstructed.canonical_json()
+        evidence.canonical_json()
+
+
+def test_low_level_allocation_with_wrong_marker_fails_closed() -> None:
+    reconstructed = object.__new__(ExternalDeliveryReceiptEvidence)
+    object.__setattr__(reconstructed, "_issuance_marker", object())
+
+    with pytest.raises(ValueError, match="validated constructor"):
+        _ = reconstructed.tenant_record_id
 
 
 def test_public_receipt_is_not_reconstructable_through_tuple_new() -> None:
     """Keep tuple allocation from bypassing the public receipt constructor."""
-    evidence = build_external_delivery_receipt_evidence(**_kwargs())
-
     with pytest.raises(TypeError):
-        tuple.__new__(ExternalDeliveryReceiptEvidence, tuple(evidence))
+        tuple.__new__(ExternalDeliveryReceiptEvidence, ())
 
 
 def test_exact_attempt_verification_rejects_receipt_subclasses() -> None:
@@ -98,7 +112,10 @@ def test_exact_attempt_verification_rejects_receipt_subclasses() -> None:
         def sha256_digest(self) -> str:
             return "f" * 64
 
-    forged = tuple.__new__(_ForgedReceipt, tuple(evidence))
+    with pytest.raises(TypeError, match="cannot be subclassed"):
+        _ForgedReceipt(**_kwargs())
+
+    forged = object.__new__(_ForgedReceipt)
 
     with pytest.raises(TypeError, match="ExternalDeliveryReceiptEvidence"):
         verify_exact_delivery_attempt(
@@ -113,11 +130,10 @@ def test_exact_attempt_verification_rejects_receipt_subclasses() -> None:
 
 def test_exact_attempt_verification_validates_evidence_before_scope_comparison() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
-    raw_values = list(evidence)
-    raw_values[0] = _ExplosiveEquality()
-    reconstructed = tuple.__new__(ExternalDeliveryReceiptEvidence, tuple(raw_values))
+    reconstructed = object.__new__(ExternalDeliveryReceiptEvidence)
+    object.__setattr__(reconstructed, "_field_values", (_ExplosiveEquality(),))
 
-    with pytest.raises(ValueError, match="tenant_record_id"):
+    with pytest.raises(ValueError, match="validated constructor"):
         verify_exact_delivery_attempt(
             reconstructed,
             tenant_record_id=evidence.tenant_record_id,

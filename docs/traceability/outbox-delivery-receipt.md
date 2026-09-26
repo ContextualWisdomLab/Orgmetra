@@ -13,8 +13,8 @@
 | Trust-bearing text cannot retain behavior-overriding `str` subclasses | exact-attempt equality and fixed trust-state subclass regressions | exact built-in primitive validation |
 | Receipt subclasses cannot override verification/digest behavior | `test_exact_attempt_verification_rejects_receipt_subclasses` | exact-type check in `verify_exact_delivery_attempt` |
 | Retry replay cannot cross attempt boundaries | exact-attempt mismatch regression | `delivery_attempt_count` in reconciliation tuple |
-| Copy/low-level reconstruction cannot bypass fixed safety/trust invariants | `test_copy_bypass_cannot_create_a_second_canonical_truth` | canonical export revalidation |
-| Structural mutation is rejected | `test_evidence_is_structurally_immutable_after_construction` | tuple-backed evidence type |
+| Copy/low-level reconstruction cannot bypass fixed safety/trust invariants | tuple-surface, raw-allocation, wrong-marker, and low-level timestamp replacement regressions | closure-private issuance plus canonical export revalidation |
+| Structural mutation is rejected | `test_evidence_is_structurally_immutable_after_construction` | sealed non-tuple evidence type |
 | Exact owned statement/branch coverage | canonical hosted `Foundation CI` package command | pytest-cov gate at 100% |
 
 ## Upstream protected-main truth

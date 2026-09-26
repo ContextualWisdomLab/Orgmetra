@@ -29,11 +29,13 @@ artifact, provider-reported delivery time, host observation time, and evidence v
 
 External transport evidence remains explicitly untrusted and carries
 `not_authorized_to_mutate_delivery_state`. It excludes raw provider responses and protected
-HR values. Canonical export revalidates every trust-bearing field, including instances
-created through copy or low-level tuple construction, so those construction paths cannot
-bypass fixed safety-state, shape, chronology, or identifier invariants. Separately
-constructed receipts remain untrusted and still require authoritative exact-attempt and
-artifact reconciliation.
+HR values. The public receipt is a sealed non-tuple value: constructor validation stores
+detached fields before a closure-private marker is applied, every public field read checks
+that marker, raw allocations are unusable, and `tuple.__new__` cannot construct the type.
+Canonical export additionally revalidates every trust-bearing field so low-level state
+replacement cannot bypass fixed safety-state, shape, chronology, or identifier invariants.
+Separately constructed receipts remain untrusted and still require authoritative
+exact-attempt and artifact reconciliation.
 
 Trust-bearing primitive values are accepted only as their exact built-in Python types,
 not caller-defined subclasses whose equality or serialization behavior can be overridden.
