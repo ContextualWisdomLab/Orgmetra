@@ -8,8 +8,9 @@ def _workflow(path: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
-def test_foundation_ci_runs_people_api_on_default_branch_pull_requests() -> None:
-    """Keep People API coverage in the single repository quality workflow."""
+def test_foundation_ci_delegates_people_api_to_discovered_service_runner() -> None:
+    """Keep People API in the fail-closed discovered-service quality lane."""
     workflow = _workflow(".github/workflows/foundation-ci.yml")
     assert "      - develop\n" in workflow
-    assert "services/people-api/pyproject.toml services/people-api/tests" in workflow
+    assert "Run discovered service contracts on primary runtime" in workflow
+    assert "python scripts/foundation_service_compatibility.py --require-execution" in workflow

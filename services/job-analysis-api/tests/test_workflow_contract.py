@@ -8,11 +8,12 @@ def _workflow(path: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
-def test_foundation_ci_runs_job_analysis_on_default_branch_pull_requests() -> None:
-    """Keep Job Analysis coverage in the single repository quality workflow."""
+def test_foundation_ci_delegates_job_analysis_to_discovered_service_runner() -> None:
+    """Keep Job Analysis in the fail-closed discovered-service quality lane."""
     workflow = _workflow(".github/workflows/foundation-ci.yml")
     assert "      - develop\n" in workflow
-    assert "services/job-analysis-api/pyproject.toml services/job-analysis-api/tests" in workflow
+    assert "Run discovered service contracts on primary runtime" in workflow
+    assert "python scripts/foundation_service_compatibility.py --require-execution" in workflow
 
 
 def test_foundation_ci_includes_job_analysis_postgres_contract() -> None:
