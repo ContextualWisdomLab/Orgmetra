@@ -12,7 +12,10 @@ from orgmetra_outbox_delivery_receipt import (
     build_external_delivery_receipt_evidence,
     verify_exact_delivery_attempt,
 )
-from orgmetra_outbox_delivery_receipt.receipt import _canonical_timestamp
+from orgmetra_outbox_delivery_receipt.receipt import (
+    _canonical_timestamp,
+    _external_delivery_receipt_evidence_values,
+)
 
 
 class _FailingTimezone(tzinfo):
@@ -112,13 +115,21 @@ def test_issued_receipt_has_no_replaceable_internal_value_slot() -> None:
 
 
 def test_identity_registry_does_not_retain_collected_receipts() -> None:
+    registry = next(
+        cell.cell_contents
+        for cell in _external_delivery_receipt_evidence_values.__closure__ or ()
+        if isinstance(cell.cell_contents, dict)
+    )
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
     evidence_reference = ref(evidence)
+    evidence_identity = id(evidence)
+    assert evidence_identity in registry
 
     del evidence
     gc.collect()
 
     assert evidence_reference() is None
+    assert evidence_identity not in registry
 
 
 def test_canonical_timestamp_rejects_nonfrozen_runtime_values() -> None:
