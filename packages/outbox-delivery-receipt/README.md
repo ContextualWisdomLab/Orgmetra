@@ -46,5 +46,7 @@ audit/outbox boundary.
 
 ## Current integration status
 
-This package is proposed by PR #151. Until that PR integrates into protected `develop`,
-it is active-PR truth, not a commercially available protected-main capability.
+This package is proposed by successor PR #448, which carries the valid package and
+documentation delta from PR #151 while integrating validation into canonical Foundation CI.
+Until #448 integrates into protected `develop`, it is active-PR truth, not a commercially
+available protected-main capability.
