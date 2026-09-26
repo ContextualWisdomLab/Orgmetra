@@ -4,8 +4,20 @@
   "generated_for_branch": "feat/audit-outbox-envelope",
   "files": [
     {
+      "path": ".github/foundation-postgres-contracts.json",
+      "sha256": "66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64",
+      "bytes": 3112,
+      "lines": 89
+    },
+    {
+      "path": ".github/scripts/foundation-postgres-contracts.py",
+      "sha256": "bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286",
+      "bytes": 19001,
+      "lines": 542
+    },
+    {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "025a9a0588f68720640bf46a754f62444ff44c8ef48b69a79fd4fbd391083be2",
+      "sha256": "a6f057c8e1f49a14d906cde4fdb22eba3a84da6116150c8d17e07b7fdcfa708c",
       "bytes": 24325,
       "lines": 528
     },
@@ -29,9 +41,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "84fa1c8b4cd9e4f99cd3604a74fbf2987a57acd29121fb14be7ebe4082b938f4",
+      "bytes": 18044,
+      "lines": 78
     },
     {
       "path": "CLAUDE.md",
@@ -56,84 +68,6 @@
       "sha256": "1a9fc400d26d8137ae5911488794a6d3fa915957c95f27b36a48cef0fdf823c6",
       "bytes": 3785,
       "lines": 81
-    },
-    {
-      "path": "database/migrations/0001_foundation_schema.sql",
-      "sha256": "ce2ae52fc66b2f99597ea5285df82c66f90caa46174fef4930d68a8b6177d0dd",
-      "bytes": 38747,
-      "lines": 916
-    },
-    {
-      "path": "database/migrations/0002_sealed_evidence_digest.sql",
-      "sha256": "93d659ca8e0e9293a83d5422d043be7b1022c5470a5b22670aa3416fa334a04c",
-      "bytes": 6649,
-      "lines": 202
-    },
-    {
-      "path": "database/migrations/0003_audit_outbox_persistence.sql",
-      "sha256": "2aa7bbb8220923ec584537c0cd46f0cba2b692d69d431f097b7df6db75235bfc",
-      "bytes": 15417,
-      "lines": 423
-    },
-    {
-      "path": "database/migrations/0004_outbox_delivery_claim.sql",
-      "sha256": "d4504acf7d58528a2a8f4f03d1584b868c8d3ba9046a007b9c2e7cfef993b2ef",
-      "bytes": 9451,
-      "lines": 234
-    },
-    {
-      "path": "database/migrations/0005_outbox_delivery_finalization.sql",
-      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5b7a3a25fa60016b6a4961",
-      "bytes": 6125,
-      "lines": 170
-    },
-    {
-      "path": "database/migrations/0006_outbox_delivery_dead_letter.sql",
-      "sha256": "c1fb91cdf98169fd6684984e86cb0a14fa19c8f1226028d2346a2a069df2b3c7",
-      "bytes": 24919,
-      "lines": 628
-    },
-    {
-      "path": "database/migrations/0007_outbox_retry_exhaustion.sql",
-      "sha256": "812f50d70ca5929c7eba964d34a208aedee660d11cc7ffc09d67688c4737e0d5",
-      "bytes": 19081,
-      "lines": 476
-    },
-    {
-      "path": "database/migrations/0008_audit_outbox_review_hardening.sql",
-      "sha256": "c3713a12db9d00fdc10005df1f86c07965e9555eefad78ca67e994537a739d9b",
-      "bytes": 17562,
-      "lines": 448
-    },
-    {
-      "path": "database/migrations/0009_candidate_worker_conversion_governance.sql",
-      "sha256": "4030666629a6b8deb383b8337ead4f09d6a945969313def2577a38f31f06cda9",
-      "bytes": 11537,
-      "lines": 281
-    },
-    {
-      "path": "database/migrations/0010_validity_study_case_integrity.sql",
-      "sha256": "3f594810ac9e1a6747a2bb4838e5ce65b921cb6e3d36fcdc3ff08b4a7579ebd1",
-      "bytes": 11979,
-      "lines": 313
-    },
-    {
-      "path": "database/migrations/0011_criterion_observation_scope.sql",
-      "sha256": "f9fe7c35f1ee7b167e1c2ba75a50a84febda9a6ccf8123b4f5726f51968694f9",
-      "bytes": 7444,
-      "lines": 165
-    },
-    {
-      "path": "database/migrations/0012_people_mutation_idempotency.sql",
-      "sha256": "52dbbb9ec7f9be5291593ba88f228d7fffd736dcb99547a08c1d6cad076afb69",
-      "bytes": 3162,
-      "lines": 76
-    },
-    {
-      "path": "database/migrations/0013_job_analysis_snapshot.sql",
-      "sha256": "b6553a5a4c94c4aa9f341a474e13bbe34db63044eda2446b3ebee178995977ee",
-      "bytes": 12713,
-      "lines": 260
     },
     {
       "path": "docs/API_CONTRACT.md",
@@ -335,8 +269,8 @@
     },
     {
       "path": "package.json",
-      "sha256": "59ae9e3e67c3fba9320cb18439692395cdfd16ae5c24e3c4cf30d77d63ebabb5",
-      "bytes": 388,
+      "sha256": "900103d072429e9471f32a06002edfdf30cc1f9ac1eb4c5c0bf9b062199f4d17",
+      "bytes": 457,
       "lines": 9
     },
     {
@@ -359,9 +293,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "9b03efbbdffa60a05f5924e8a61b1cbc3cd75c502df428a5920085e8d0bf3603",
-      "bytes": 28121,
-      "lines": 688
+      "sha256": "cc588b1f3c43592e7a362c0f73ffb3bf081893d7d4c68be8ae56a318cffb20bd",
+      "bytes": 26922,
+      "lines": 666
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -371,9 +305,9 @@
     },
     {
       "path": "tests/dispatcher-inventory.test.mjs",
-      "sha256": "09f5e64410e6b7a26bf8d6ce61c50b737da2ea85d955f91eba63aa21f1537261",
-      "bytes": 1597,
-      "lines": 34
+      "sha256": "f5abc29cbd12da6a61595b92c16e8b98387ebd71edd68e1a4fff22f51d165c0e",
+      "bytes": 1948,
+      "lines": 44
     },
     {
       "path": "tests/foundation-contract.test.mjs",
@@ -388,88 +322,22 @@
       "lines": 195
     },
     {
-      "path": "tests/test_audit_outbox_hardening_postgres.sh",
-      "sha256": "518ba2f37ba6292943e5abe22c2599452b2f031a42e453b2493aedf8714421a0",
-      "bytes": 13396,
-      "lines": 333
+      "path": "tests/test_foundation_postgres_contracts.py",
+      "sha256": "e354eb6fe562ab6c6502ff3913b979f8c99c637ee4809e2890fa74e0786602a5",
+      "bytes": 20423,
+      "lines": 510
     },
     {
-      "path": "tests/test_audit_outbox_postgres.sh",
-      "sha256": "e57a04920a0ba97fa6a06752d15ea150016ab8d44099e998c5c4f4067592b4d2",
-      "bytes": 13443,
-      "lines": 357
-    },
-    {
-      "path": "tests/test_bitemporal_postgres.sh",
-      "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc",
-      "bytes": 8209,
-      "lines": 230
-    },
-    {
-      "path": "tests/test_candidate_worker_conversion_postgres.sh",
-      "sha256": "681cb74d6cfa859ed92c6c2439881ea20c430ef8df94ec662e2807761a377f90",
-      "bytes": 14673,
-      "lines": 344
-    },
-    {
-      "path": "tests/test_criterion_observation_scope_postgres.sh",
-      "sha256": "0ee9539ee57f840c27d08009f7868cdc8662669df78a01dbc8be39216b8f1a3d",
-      "bytes": 17811,
-      "lines": 469
-    },
-    {
-      "path": "tests/test_evidence_sealing_postgres.sh",
-      "sha256": "57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7",
-      "bytes": 11349,
-      "lines": 370
-    },
-    {
-      "path": "tests/test_job_analysis_snapshot_postgres.sh",
-      "sha256": "ca9c323a1dd68cfc520277efbbb7495e37fb3ca027890928c8624e5b4f57403f",
-      "bytes": 13542,
-      "lines": 296
-    },
-    {
-      "path": "tests/test_operational_uuid_postgres.sh",
-      "sha256": "7378f98f0d4b3000e8ea641d8701f1540dbad71410b3637d81d799969e0f6ff7",
-      "bytes": 3346,
-      "lines": 101
-    },
-    {
-      "path": "tests/test_outbox_claim_postgres.sh",
-      "sha256": "1027806d436ebfe34e108c25b6a4001f43b9550f1d70057c6c0d7974323b0c9b",
-      "bytes": 14817,
-      "lines": 429
-    },
-    {
-      "path": "tests/test_outbox_dead_letter_postgres.sh",
-      "sha256": "0d728d578e64252e6079f2d141ddaa7fa9cfbf9784e625832273596d69a6e13d",
-      "bytes": 14008,
-      "lines": 377
-    },
-    {
-      "path": "tests/test_people_mutation_idempotency_postgres.sh",
-      "sha256": "3f57e12f80bd1b034c9aac54b669d8530106e3e26b3795689671fb53807b3cd5",
-      "bytes": 16191,
-      "lines": 381
-    },
-    {
-      "path": "tests/test_tenant_isolation_postgres.sh",
-      "sha256": "dd649435ef8ab9e57f0609c101917e36656a6d40d63de9bcdbdac23d764f6c3a",
-      "bytes": 15134,
-      "lines": 388
-    },
-    {
-      "path": "tests/test_validity_study_case_postgres.sh",
-      "sha256": "0070ad58300323c7f9900c5645e0df3106b36ccd245ae686e982c2fd6fa4dc02",
-      "bytes": 14708,
-      "lines": 301
+      "path": "tests/test_foundation_postgres_process_quiescence.py",
+      "sha256": "4778a536275c768677a25cd46fcb833d278f7fe627a762ad70fc7f2ec9828e1f",
+      "bytes": 4688,
+      "lines": 98
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "091836b2f68600a30b08f7da2cea8b3bef10201a123da720a7369bf10985eec2",
-      "bytes": 27237,
-      "lines": 637
+      "sha256": "9ac3894c2ca2c9793361194997435b117b94e318ef218f84eb1ee08fdfa9b4b4",
+      "bytes": 25994,
+      "lines": 615
     }
   ]
 }

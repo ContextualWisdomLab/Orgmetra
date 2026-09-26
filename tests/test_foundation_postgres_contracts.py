@@ -451,8 +451,12 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
         self.assertIn(snapshot, execution)
         self.assertIn('snapshot_by_script["$script"]="$snapshot_script"', execution)
         self.assertIn('verify_snapshot_bytes "$contract"', execution)
-        self.assertIn('verify_snapshot_bytes "$companion"', execution)
-        self.assertIn('chmod 0555 "$snapshot_parent"', execution)
+        self.assertIn('run_contract_snapshot "$companion" "$database_url"', execution)
+        self.assertIn('verify_candidate_bytes "$script"', execution)
+        self.assertIn(
+            'chmod 0555 "$snapshot_dir" "$candidate_snapshot_dir" "$snapshot_parent"',
+            execution,
+        )
         self.assertIn('contract_user="orgmetra_pg_contract"', execution)
         self.assertIn('sudo -n -u "$contract_user" true', execution)
         self.assertIn('sudo -n -u "$contract_user" env', execution)
