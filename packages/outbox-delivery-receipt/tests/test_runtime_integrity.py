@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import gc
 from datetime import datetime, timedelta, timezone, tzinfo
 from uuid import uuid4
+from weakref import ref
 
 import pytest
 
@@ -10,6 +12,7 @@ from orgmetra_outbox_delivery_receipt import (
     build_external_delivery_receipt_evidence,
     verify_exact_delivery_attempt,
 )
+from orgmetra_outbox_delivery_receipt.receipt import _canonical_timestamp
 
 
 class _FailingTimezone(tzinfo):
@@ -26,11 +29,6 @@ class _NoOffsetTimezone(tzinfo):
 
     def dst(self, dt: datetime | None) -> None:
         return None
-
-
-class _ExplosiveEquality:
-    def __eq__(self, other: object) -> bool:
-        raise RuntimeError("untrusted evidence equality executed")
 
 
 def _kwargs() -> dict[str, object]:
@@ -71,27 +69,23 @@ def test_timezone_provider_without_offset_fails_closed() -> None:
 
 def test_low_level_reconstruction_with_nonfrozen_timestamp_fails_closed() -> None:
     reconstructed = object.__new__(ExternalDeliveryReceiptEvidence)
-    object.__setattr__(reconstructed, "_field_values", ())
 
     with pytest.raises(ValueError, match="validated constructor"):
         reconstructed.canonical_json()
 
 
-def test_low_level_timestamp_replacement_fails_closed() -> None:
+def test_low_level_state_replacement_is_impossible() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
-    raw_values = list(object.__getattribute__(evidence, "_field_values"))
-    raw_values[8] = datetime(
-        2026, 8, 29, 10, 2, 3, tzinfo=timezone(timedelta(hours=9))
-    )
-    object.__setattr__(evidence, "_field_values", tuple(raw_values))
 
-    with pytest.raises(ValueError, match="transport_delivered_at"):
-        evidence.canonical_json()
+    with pytest.raises(AttributeError):
+        object.__setattr__(evidence, "_field_values", object())
 
 
 def test_low_level_allocation_with_wrong_marker_fails_closed() -> None:
     reconstructed = object.__new__(ExternalDeliveryReceiptEvidence)
-    object.__setattr__(reconstructed, "_issuance_marker", object())
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(reconstructed, "_issuance_marker", object())
 
     with pytest.raises(ValueError, match="validated constructor"):
         _ = reconstructed.tenant_record_id
@@ -99,16 +93,13 @@ def test_low_level_allocation_with_wrong_marker_fails_closed() -> None:
 
 def test_issued_marker_cannot_be_cloned_into_a_forged_receipt() -> None:
     issued = build_external_delivery_receipt_evidence(**_kwargs())
-    forged_values = list(object.__getattribute__(issued, "_field_values"))
-    forged_values[11] = True
-    forged = object.__new__(ExternalDeliveryReceiptEvidence)
-    object.__setattr__(forged, "_field_values", tuple(forged_values))
-    object.__setattr__(
-        forged,
-        "_issuance_marker",
-        object.__getattribute__(issued, "_issuance_marker"),
-    )
 
+    with pytest.raises(AttributeError):
+        object.__getattribute__(issued, "_issuance_marker")
+    with pytest.raises(AttributeError):
+        object.__getattribute__(issued, "_field_values")
+
+    forged = object.__new__(ExternalDeliveryReceiptEvidence)
     with pytest.raises(ValueError, match="validated constructor"):
         _ = forged.contains_hr_payload
 
@@ -118,6 +109,21 @@ def test_issued_receipt_has_no_replaceable_internal_value_slot() -> None:
 
     with pytest.raises(AttributeError):
         object.__setattr__(evidence, "_field_values", ())
+
+
+def test_identity_registry_does_not_retain_collected_receipts() -> None:
+    evidence = build_external_delivery_receipt_evidence(**_kwargs())
+    evidence_reference = ref(evidence)
+
+    del evidence
+    gc.collect()
+
+    assert evidence_reference() is None
+
+
+def test_canonical_timestamp_rejects_nonfrozen_runtime_values() -> None:
+    with pytest.raises(ValueError, match="must be frozen built-in UTC datetime evidence"):
+        _canonical_timestamp("2026-08-29T01:02:03Z", "observed_at")
 
 
 def test_public_receipt_is_not_reconstructable_through_tuple_new() -> None:
@@ -154,7 +160,6 @@ def test_exact_attempt_verification_rejects_receipt_subclasses() -> None:
 def test_exact_attempt_verification_validates_evidence_before_scope_comparison() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
     reconstructed = object.__new__(ExternalDeliveryReceiptEvidence)
-    object.__setattr__(reconstructed, "_field_values", (_ExplosiveEquality(),))
 
     with pytest.raises(ValueError, match="validated constructor"):
         verify_exact_delivery_attempt(

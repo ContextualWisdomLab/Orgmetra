@@ -34,10 +34,11 @@ lease, authorization, audit, and persistence checks.
 ## Integrity model
 
 The public evidence type is a sealed non-tuple immutable value. Its validated constructor
-stores detached fields before applying a closure-private marker; every public field read
-verifies that marker. Raw `object.__new__` allocations remain unusable, while
-`tuple.__new__` cannot allocate the type at all. Ordinary mutation and deletion fail, and
-canonical export revalidates every trust-bearing field so low-level state replacement
+stores detached fields in a closure-private identity registry; the object itself exposes
+no marker or value slot, and every public field read resolves the exact issued identity.
+Raw `object.__new__` allocations remain unusable, while `tuple.__new__` cannot allocate the
+type at all. Ordinary mutation and deletion fail, and canonical export revalidates one
+immutable registry snapshot so state replacement and time-of-check/time-of-use switching
 cannot bypass the fixed safety-state, shape, chronology, or identifier invariants. A
 separately constructed receipt is still untrusted evidence and must independently match
 the authoritative exact attempt plus the external receipt artifact before any governed
@@ -45,7 +46,9 @@ completion can occur.
 
 This is an application evidence contract, not a digital-signature scheme. Durable
 cross-process authenticity and retention belong to the authoritative persistence and
-audit/outbox boundary.
+audit/outbox boundary. Code with arbitrary same-process reflection, bytecode rewriting,
+debugger access, or native-memory access is outside this value-object boundary and must be
+isolated by the host runtime.
 
 ## Current integration status
 

@@ -30,10 +30,12 @@ artifact, provider-reported delivery time, host observation time, and evidence v
 External transport evidence remains explicitly untrusted and carries
 `not_authorized_to_mutate_delivery_state`. It excludes raw provider responses and protected
 HR values. The public receipt is a sealed non-tuple value: constructor validation stores
-detached fields before a closure-private marker is applied, every public field read checks
-that marker, raw allocations are unusable, and `tuple.__new__` cannot construct the type.
-Canonical export additionally revalidates every trust-bearing field so low-level state
-replacement cannot bypass fixed safety-state, shape, chronology, or identifier invariants.
+detached fields in a closure-private identity registry, the object exposes no marker or
+value slot, every public field read resolves the exact issued identity, raw allocations
+are unusable, and `tuple.__new__` cannot construct the type. Canonical export revalidates
+and serializes one immutable registry snapshot so seal cloning, state replacement, and
+time-of-check/time-of-use switching cannot bypass fixed safety-state, shape, chronology,
+or identifier invariants.
 Separately constructed receipts remain untrusted and still require authoritative
 exact-attempt and artifact reconciliation.
 
@@ -46,6 +48,10 @@ Canonical export rejects low-level reconstructed evidence unless both stored tim
 are already those frozen built-in UTC values. Exact-attempt verification likewise accepts
 only the exact `ExternalDeliveryReceiptEvidence` type so a subclass cannot override the
 returned digest or other trust behavior.
+
+This value-object boundary is not cryptographic secrecy against arbitrary same-process
+reflection, bytecode rewriting, debugger access, or native-memory access. The host must
+isolate code with those capabilities at the process/runtime boundary.
 
 ## Why not modify the outbox migration here
 

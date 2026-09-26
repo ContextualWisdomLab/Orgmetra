@@ -12,6 +12,7 @@ from hashlib import sha256
 import json
 import re
 from uuid import UUID
+from weakref import ref
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -194,7 +195,7 @@ _RECEIPT_FIELD_INDEX = {
 class ExternalDeliveryReceiptEvidence:
     """Sealed immutable evidence that an external transport reported delivery."""
 
-    __slots__ = ("_field_values", "_issuance_marker")
+    __slots__ = ("__weakref__",)
 
     def __new__(
         cls,
@@ -247,8 +248,7 @@ class ExternalDeliveryReceiptEvidence:
         """Expose receipt fields only after verifying closure-private issuance."""
         field_index = _RECEIPT_FIELD_INDEX.get(name)
         if field_index is not None:
-            _require_external_delivery_receipt_evidence_issued(self)
-            values = object.__getattribute__(self, "_field_values")
+            values = _external_delivery_receipt_evidence_values(self)
             return values[field_index]
         return object.__getattribute__(self, name)
 
@@ -268,16 +268,15 @@ class ExternalDeliveryReceiptEvidence:
         """Compare two issued receipts by their complete immutable values."""
         if type(other) is not ExternalDeliveryReceiptEvidence:
             return NotImplemented
-        _require_external_delivery_receipt_evidence_issued(self)
-        _require_external_delivery_receipt_evidence_issued(other)
-        return object.__getattribute__(self, "_field_values") == object.__getattribute__(
-            other, "_field_values"
+        return _external_delivery_receipt_evidence_values(
+            self
+        ) == _external_delivery_receipt_evidence_values(
+            other
         )
 
     def __hash__(self) -> int:
         """Hash the complete immutable values of one issued receipt."""
-        _require_external_delivery_receipt_evidence_issued(self)
-        return hash(object.__getattribute__(self, "_field_values"))
+        return hash(_external_delivery_receipt_evidence_values(self))
 
     @property
     def transport_delivered_at_utc(self) -> str:
@@ -291,47 +290,36 @@ class ExternalDeliveryReceiptEvidence:
 
     def canonical_json(self) -> str:
         """Return deterministic value-minimized JSON for immutable audit correlation."""
+        field_values = dict(
+            zip(
+                _RECEIPT_FIELD_NAMES,
+                _external_delivery_receipt_evidence_values(self),
+                strict=True,
+            )
+        )
         transport_delivered_at_utc, observed_at_utc = _validate_contract(
-            tenant_record_id=self.tenant_record_id,
-            outbox_delivery_record_id=self.outbox_delivery_record_id,
-            audit_event_record_id=self.audit_event_record_id,
-            delivery_target_code=self.delivery_target_code,
-            delivery_attempt_count=self.delivery_attempt_count,
-            transport_provider_code=self.transport_provider_code,
-            transport_receipt_reference=self.transport_receipt_reference,
-            transport_receipt_digest=self.transport_receipt_digest,
-            transport_delivered_at=self.transport_delivered_at,
-            observed_at=self.observed_at,
-            evidence_version=self.evidence_version,
-            contains_hr_payload=self.contains_hr_payload,
-            contains_destination=self.contains_destination,
-            contains_credentials=self.contains_credentials,
-            delivery_outcome_code=self.delivery_outcome_code,
-            trust_state=self.trust_state,
-            reconciliation_state=self.reconciliation_state,
-            mutation_authority=self.mutation_authority,
-            next_action=self.next_action,
+            **field_values,
         )
         payload = {
-            "audit_event_record_id": self.audit_event_record_id,
-            "contains_credentials": self.contains_credentials,
-            "contains_destination": self.contains_destination,
-            "contains_hr_payload": self.contains_hr_payload,
-            "delivery_attempt_count": self.delivery_attempt_count,
-            "delivery_outcome_code": self.delivery_outcome_code,
-            "delivery_target_code": self.delivery_target_code,
-            "evidence_version": self.evidence_version,
-            "mutation_authority": self.mutation_authority,
-            "next_action": self.next_action,
+            "audit_event_record_id": field_values["audit_event_record_id"],
+            "contains_credentials": field_values["contains_credentials"],
+            "contains_destination": field_values["contains_destination"],
+            "contains_hr_payload": field_values["contains_hr_payload"],
+            "delivery_attempt_count": field_values["delivery_attempt_count"],
+            "delivery_outcome_code": field_values["delivery_outcome_code"],
+            "delivery_target_code": field_values["delivery_target_code"],
+            "evidence_version": field_values["evidence_version"],
+            "mutation_authority": field_values["mutation_authority"],
+            "next_action": field_values["next_action"],
             "observed_at": observed_at_utc,
-            "outbox_delivery_record_id": self.outbox_delivery_record_id,
-            "reconciliation_state": self.reconciliation_state,
-            "tenant_record_id": self.tenant_record_id,
+            "outbox_delivery_record_id": field_values["outbox_delivery_record_id"],
+            "reconciliation_state": field_values["reconciliation_state"],
+            "tenant_record_id": field_values["tenant_record_id"],
             "transport_delivered_at": transport_delivered_at_utc,
-            "transport_provider_code": self.transport_provider_code,
-            "transport_receipt_digest": self.transport_receipt_digest,
-            "transport_receipt_reference": self.transport_receipt_reference,
-            "trust_state": self.trust_state,
+            "transport_provider_code": field_values["transport_provider_code"],
+            "transport_receipt_digest": field_values["transport_receipt_digest"],
+            "transport_receipt_reference": field_values["transport_receipt_reference"],
+            "trust_state": field_values["trust_state"],
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
@@ -342,18 +330,16 @@ class ExternalDeliveryReceiptEvidence:
 
 def _build_external_delivery_receipt_evidence_runtime():
     """Create closure-private issuance state for validated receipt evidence."""
-    issuance_marker = object()
+    issued_values: dict[
+        int, tuple[ref[ExternalDeliveryReceiptEvidence], tuple[object, ...]]
+    ] = {}
 
-    def require_issued(evidence: ExternalDeliveryReceiptEvidence) -> None:
-        """Reject raw allocations that did not pass the validated constructor."""
-        try:
-            marker = object.__getattribute__(evidence, "_issuance_marker")
-        except AttributeError as exc:
-            raise ValueError(
-                "receipt evidence was not issued by the validated constructor"
-            ) from exc
-        if marker is not issuance_marker:
+    def values_for(evidence: ExternalDeliveryReceiptEvidence) -> tuple[object, ...]:
+        """Return closure-owned values only for the exact registered instance."""
+        registered = issued_values.get(id(evidence))
+        if registered is None or registered[0]() is not evidence:
             raise ValueError("receipt evidence was not issued by the validated constructor")
+        return registered[1]
 
     def construct(
         *,
@@ -428,15 +414,23 @@ def _build_external_delivery_receipt_evidence_runtime():
             next_action,
         )
         evidence = object.__new__(ExternalDeliveryReceiptEvidence)
-        object.__setattr__(evidence, "_field_values", values)
-        object.__setattr__(evidence, "_issuance_marker", issuance_marker)
+        evidence_identity = id(evidence)
+
+        def retire(reference: ref[ExternalDeliveryReceiptEvidence]) -> None:
+            """Discard registry state only for the collected issued instance."""
+            registered = issued_values.get(evidence_identity)
+            if registered is not None and registered[0] is reference:  # pragma: no branch
+                del issued_values[evidence_identity]
+
+        evidence_reference = ref(evidence, retire)
+        issued_values[evidence_identity] = (evidence_reference, values)
         return evidence
 
-    return require_issued, construct
+    return values_for, construct
 
 
 (
-    _require_external_delivery_receipt_evidence_issued,
+    _external_delivery_receipt_evidence_values,
     _construct_external_delivery_receipt_evidence,
 ) = _build_external_delivery_receipt_evidence_runtime()
 del _build_external_delivery_receipt_evidence_runtime

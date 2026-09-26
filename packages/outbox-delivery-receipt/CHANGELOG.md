@@ -4,9 +4,10 @@
 
 - Integrate package verification into canonical Foundation CI rather than a leaf-owned workflow.
 - Document the public receipt constructor and its non-overridable fixed safety fields.
-- Replace tuple-backed receipt storage with closure-sealed non-tuple evidence so
-  `tuple.__new__` and raw allocations cannot expose forged public fields while preserving
-  immutable value equality and hashing.
+- Replace tuple-backed receipt storage with closure-sealed non-tuple evidence whose values
+  live in an identity registry rather than readable object slots, so `tuple.__new__`, raw
+  allocation, seal cloning, state replacement, and validation/serialization switching
+  cannot expose forged public fields while preserving immutable value equality and hashing.
 - Define value-minimized external transport delivery receipt evidence.
 - Bind receipts to an exact tenant/outbox/audit/target/attempt coordinate.
 - Keep transport evidence untrusted and explicitly non-authorizing for delivery-state
