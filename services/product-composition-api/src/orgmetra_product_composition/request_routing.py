@@ -13,7 +13,7 @@ import re
 from threading import RLock
 from weakref import WeakKeyDictionary
 
-from .activation import ActivationConflictError, DeploymentIdentity
+from .activation import DeploymentIdentity
 from .activation_runtime_integrity import AuthorizedPostgresActivationRegistry
 from .admission import CompositionGeneration, CompositionRoute, _ALLOWED_METHODS
 from .serving_snapshot import RecoveredRouteSnapshot, current_route_ids_for_snapshot
@@ -42,7 +42,7 @@ class CompositionMethodNotImplementedError(CompositionRoutingError):
 class CompositionMethodNotAllowedError(CompositionRoutingError):
     """Raised with current methods when one selected Path Item rejects the request method."""
 
-    __slots__ = ("allowed_methods", "__weakref__")
+    __slots__ = ("allowed_methods",)
 
     def __init__(self, message: str, *, allowed_methods: tuple[object, ...]) -> None:
         """Issue one canonical Allow authority, including implicit HEAD parity for GET."""
@@ -181,27 +181,6 @@ def _advertised_route_methods(route: CompositionRoute) -> frozenset[str]:
     return frozenset(methods)
 
 
-def _current_route_ids(
-    registry: AuthorizedPostgresActivationRegistry,
-    deployment: DeploymentIdentity,
-    snapshot: RecoveredRouteSnapshot,
-) -> frozenset[str]:
-    """Project superseded durable serving state as route unavailability, not HTTP method truth.
-
-    ``ActivationConflictError`` is the typed #437 signal that the recovery-bound snapshot no longer
-    matches current durable activation/recovery state. That is a serviceability failure for this
-    request. Authorization/integrity failures deliberately remain unwrapped so they cannot be
-    laundered into an ordinary availability response.
-    """
-
-    try:
-        return frozenset(current_route_ids_for_snapshot(registry, deployment, snapshot))
-    except ActivationConflictError as exc:
-        raise CompositionRouteUnavailableError(
-            "recovered route snapshot no longer has current durable serving authority"
-        ) from exc
-
-
 def current_route_id_for_request(
     registry: AuthorizedPostgresActivationRegistry,
     deployment: DeploymentIdentity,
@@ -233,7 +212,9 @@ def current_route_id_for_request(
         route for route in path_routes if _route_supports_request_method(route, canonical_method)
     )
     if not method_routes:
-        available_route_ids = _current_route_ids(registry, deployment, snapshot)
+        available_route_ids = frozenset(
+            current_route_ids_for_snapshot(registry, deployment, snapshot)
+        )
         allowed_methods = tuple(
             sorted(
                 {
@@ -255,7 +236,9 @@ def current_route_id_for_request(
 
     selected_route = method_routes[0]
     selected_route_id = selected_route.route_id
-    available_route_ids = _current_route_ids(registry, deployment, snapshot)
+    available_route_ids = frozenset(
+        current_route_ids_for_snapshot(registry, deployment, snapshot)
+    )
     if selected_route_id not in available_route_ids:
         raise CompositionRouteUnavailableError(
             "selected declared route lacks current positive availability evidence"
