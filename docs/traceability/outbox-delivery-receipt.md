@@ -15,6 +15,7 @@
 | Retry replay cannot cross attempt boundaries | exact-attempt mismatch regression | `delivery_attempt_count` in reconciliation tuple |
 | Copy/low-level reconstruction cannot bypass fixed safety/trust invariants | tuple-surface, raw-allocation, wrong-marker, and low-level timestamp replacement regressions | closure-private issuance plus canonical export revalidation |
 | Structural mutation is rejected | `test_evidence_is_structurally_immutable_after_construction` | sealed non-tuple evidence type |
+| Sealing preserves immutable value semantics | `test_preserves_value_equality_and_hashing_after_sealing` | issued-value equality and hashing |
 | Exact owned statement/branch coverage | canonical hosted `Foundation CI` package command | pytest-cov gate at 100% |
 
 ## Upstream protected-main truth

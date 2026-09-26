@@ -264,6 +264,21 @@ class ExternalDeliveryReceiptEvidence:
         """Redact correlation identifiers from routine logs."""
         return "ExternalDeliveryReceiptEvidence(<redacted>)"
 
+    def __eq__(self, other: object) -> bool:
+        """Compare two issued receipts by their complete immutable values."""
+        if type(other) is not ExternalDeliveryReceiptEvidence:
+            return NotImplemented
+        _require_external_delivery_receipt_evidence_issued(self)
+        _require_external_delivery_receipt_evidence_issued(other)
+        return object.__getattribute__(self, "_field_values") == object.__getattribute__(
+            other, "_field_values"
+        )
+
+    def __hash__(self) -> int:
+        """Hash the complete immutable values of one issued receipt."""
+        _require_external_delivery_receipt_evidence_issued(self)
+        return hash(object.__getattribute__(self, "_field_values"))
+
     @property
     def transport_delivered_at_utc(self) -> str:
         """Return the provider-reported delivery instant in canonical UTC text."""
