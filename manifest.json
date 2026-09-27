@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "89263a97165afaf988008d8b71cebdfbeec1741289fa303c744dd545b8bac13e",
-      "bytes": 17998,
-      "lines": 78
+      "sha256": "ed3593c1a8d259def97e437c6ea344af03260802b088899481fa91195e3f3645",
+      "bytes": 18288,
+      "lines": 79
     },
     {
       "path": "CLAUDE.md",
@@ -322,6 +322,12 @@
       "lines": 69
     },
     {
+      "path": "docs/product-technical-gap-baseline.md",
+      "sha256": "73cb17e2b76cbeca1e002d8b7510a2686cbd3bdc0ef7ca61e49c7e9620ff8a6c",
+      "bytes": 63066,
+      "lines": 249
+    },
+    {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
       "sha256": "b64f21abb19373e780db8b9e64deb8ba9a6219ccf9625a651f25407b8691fcbd",
       "bytes": 8227,
@@ -359,9 +365,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "9b03efbbdffa60a05f5924e8a61b1cbc3cd75c502df428a5920085e8d0bf3603",
-      "bytes": 28121,
-      "lines": 688
+      "sha256": "f8d785b1a1a674035189d7fa92ee8924bac18d607abe09f65150caaaba362b10",
+      "bytes": 28165,
+      "lines": 689
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -377,9 +383,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "648533b4aff8cee643df4afc06b463eda788e002e11d043971c8a16804c68501",
-      "bytes": 14943,
-      "lines": 387
+      "sha256": "15a8734606a806cb80721e1a33d0a56348d4f0efe5052d15eba5fba882ea43f0",
+      "bytes": 16466,
+      "lines": 416
     },
     {
       "path": "tests/openapi-contract.test.mjs",
@@ -467,9 +473,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "091836b2f68600a30b08f7da2cea8b3bef10201a123da720a7369bf10985eec2",
-      "bytes": 27237,
-      "lines": 637
+      "sha256": "1dc234afd8018da970384c8780549c96e72af5269045d1ea544b3c0b0ee8317e",
+      "bytes": 27283,
+      "lines": 638
     }
   ]
 }

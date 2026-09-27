@@ -122,6 +122,35 @@ test('Python and Node require the identical foundation artifact set', () => {
   assert.deepEqual([...REQUIRED_FILES].sort(), pythonRequiredFiles().sort());
 });
 
+test('commercialization baseline exposes governed evidence, actions, and current exact heads', () => {
+  const baseline = readFileSync(
+    new URL('../docs/product-technical-gap-baseline.md', import.meta.url),
+    'utf8'
+  );
+
+  assert.ok(REQUIRED_FILES.includes('docs/product-technical-gap-baseline.md'));
+  assert.match(baseline, /Verified: 2026-09-27 \(Asia\/Seoul\)/);
+  assert.match(baseline, /## Evidence view index/);
+  for (const view of ['PRD', 'TRD', 'UML', 'ERD', 'Context Map', 'Gap / Action']) {
+    assert.match(baseline, new RegExp(`\\| \\*\\*${view}\\*\\* \\|`));
+  }
+  assert.match(
+    baseline,
+    /\| Gap \| Current evidence \| Buyer consequence \| Action \/ next acceptance evidence \| Status \| Priority \|/
+  );
+  const snapshot = extractSection(baseline, 'Current exact evidence snapshot');
+  assert.match(snapshot, /\| Gap support \| Repository \/ PR \| Exact head \| Truth state \| Current evidence \|/);
+  const snapshotRows = [...snapshot.matchAll(/^\| ([A-Z]+-\d+) \| `[^`]+#\d+` \| `([0-9a-f]{40})` \|/gm)];
+  assert.ok(snapshotRows.length >= 17);
+  const supportedGaps = new Set(snapshotRows.map((match) => match[1]));
+  const gapRegister = extractSection(baseline, '6. Commercialization gap register');
+  const activeGaps = [...gapRegister.matchAll(/^\| \*\*([A-Z]+-\d+)[^|]+\|.*\| Active PR \|/gm)]
+    .map((match) => match[1]);
+  for (const gapIdentifier of activeGaps) {
+    assert.ok(supportedGaps.has(gapIdentifier), `${gapIdentifier} lacks exact-head Active PR evidence`);
+  }
+});
+
 test('required constants are frozen and use accepted values', () => {
   assert.equal(Object.isFrozen(REQUIRED_FILES), true);
   assert.equal(Object.isFrozen(DATABASE_OBJECT_NAMES), true);

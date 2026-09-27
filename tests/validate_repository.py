@@ -39,6 +39,7 @@ REQUIRED = [
     "docs/TEST_STRATEGY.md",
     "docs/OPERABILITY.md",
     "docs/TRACEABILITY.md",
+    "docs/product-technical-gap-baseline.md",
     "docs/adr/README.md",
     "docs/adr/0001-orgmetra-authoritative-hris-record.md",
     "docs/adr/0002-federated-cwl-integration-boundaries.md",
