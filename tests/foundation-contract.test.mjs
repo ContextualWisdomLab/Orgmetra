@@ -105,6 +105,17 @@ test('governance docs name the protected default branch rather than stale main',
   assert.match(agents, /protected default branch/i);
 });
 
+test('README preserves the complete usable-PII control set', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  for (const control of ['export controls', 'field-level access decisions']) {
+    assert.equal(
+      readme.split(control).length - 1,
+      2,
+      `README must name ${control} in both the buyer summary and non-negotiable contract`
+    );
+  }
+});
+
 test('PostgreSQL CI service image is pinned to the approved immutable PostgreSQL 16.14 digest', () => {
   const workflow = readFileSync(
     new URL('../.github/workflows/foundation-ci.yml', import.meta.url),
