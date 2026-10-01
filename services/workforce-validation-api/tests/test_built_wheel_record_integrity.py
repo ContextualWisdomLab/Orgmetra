@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from importlib.metadata import version as installed_version
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -32,12 +33,28 @@ def test_built_owned_wheels_have_complete_verified_records(tmp_path: Path) -> No
 
     wheelhouse = tmp_path / "wheelhouse"
     wheelhouse.mkdir()
+    build_sources = tmp_path / "build-sources"
+    build_sources.mkdir()
     environment = _METADATA_CONTRACT._subprocess_environment()
     source_roots = (
         _METADATA_CONTRACT._KEYVERSE_ROOT,
         _METADATA_CONTRACT._SERVICE_ROOT,
     )
     for source_root in source_roots:
+        build_root = build_sources / source_root.name
+        shutil.copytree(
+            source_root,
+            build_root,
+            ignore=shutil.ignore_patterns(
+                "__pycache__",
+                ".pytest_cache",
+                ".coverage",
+                "build",
+                "dist",
+                "*.egg-info",
+                "*.pyc",
+            ),
+        )
         subprocess.run(
             [
                 sys.executable,
@@ -50,9 +67,9 @@ def test_built_owned_wheels_have_complete_verified_records(tmp_path: Path) -> No
                 "--no-build-isolation",
                 "--wheel-dir",
                 str(wheelhouse),
-                str(source_root),
+                str(build_root),
             ],
-            cwd=_METADATA_CONTRACT._REPOSITORY_ROOT,
+            cwd=tmp_path,
             env=environment,
             check=True,
         )
