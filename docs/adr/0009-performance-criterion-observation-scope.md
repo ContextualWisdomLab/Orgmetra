@@ -1,6 +1,6 @@
 # ADR 0009: Performance criterion observations require worker-job scope
 
-Status: Accepted
+Status: Accepted on protected `develop`
 
 ## Context
 

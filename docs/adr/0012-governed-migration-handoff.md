@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on this active PR only. This is not protected-`develop` product truth until the owning PR integrates.
+Accepted on protected `develop`.
 
 ## Context
 

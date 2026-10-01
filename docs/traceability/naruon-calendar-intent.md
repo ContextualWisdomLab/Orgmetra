@@ -2,7 +2,7 @@
 
 ## Status
 
-Active-PR only. This evidence does not describe protected-`develop` product truth until the owning PR integrates.
+Implemented on protected `develop`; Naruon remains the owner of provider execution.
 
 | Requirement | Decision / contract | Production implementation | Executable evidence |
 |---|---|---|---|
