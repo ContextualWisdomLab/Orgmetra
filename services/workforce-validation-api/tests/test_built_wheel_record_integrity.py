@@ -33,10 +33,11 @@ def test_built_owned_wheels_have_complete_verified_records(tmp_path: Path) -> No
     wheelhouse = tmp_path / "wheelhouse"
     wheelhouse.mkdir()
     environment = _METADATA_CONTRACT._subprocess_environment()
-    for source_root in (
+    source_roots = (
         _METADATA_CONTRACT._KEYVERSE_ROOT,
         _METADATA_CONTRACT._SERVICE_ROOT,
-    ):
+    )
+    for source_root in source_roots:
         subprocess.run(
             [
                 sys.executable,
@@ -60,3 +61,6 @@ def test_built_owned_wheels_have_complete_verified_records(tmp_path: Path) -> No
     assert len(wheel_paths) == 2, "RECORD acceptance must inspect both owned built wheels"
     for wheel_path in wheel_paths:
         _METADATA_CONTRACT._validate_wheel_record(wheel_path)
+    assert all(not (source_root / "build").exists() for source_root in source_roots), (
+        "wheel RECORD acceptance must not mutate repository source roots"
+    )
