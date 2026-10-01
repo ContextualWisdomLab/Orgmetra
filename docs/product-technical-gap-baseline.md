@@ -97,7 +97,7 @@ This bounded snapshot records the exact heads that support every current Active 
 | API-01 | `ContextualWisdomLab/Orgmetra#433` | `ff50182c25ccf45928b1413f947c992f62be2ded` | Planned | Draft Proposed architecture; source-current documentation is not architecture admission |
 | API-01 | `ContextualWisdomLab/Orgmetra#446` | `3a20660761bc27de74a89c4027d9a89cf74776eb` | Active PR | Draft composition leaf; local evidence does not create protected deployable composition or hosted exact-head authority |
 | API-01 | `ContextualWisdomLab/Orgmetra#447` | `c19e22d93c4b9e3d6a86f66b69f7e581c10cb249` | Active PR | Ready and stacked on #259; no hosted exact-head run transfers from its parent |
-| ORGMETRA-OUTBOX-RECEIPT-01 | `ContextualWisdomLab/Orgmetra#448` | `8f3cc0d7fd217cbc7f3b70431286110bbce71f47` | Active PR | Draft successor; Foundation CI and SAST are terminal-success, while Security Scan and CodeQL PR are terminal-failure; qualifying independent approval remains absent and live state must be re-fetched before action |
+| ORGMETRA-OUTBOX-RECEIPT-01 | `ContextualWisdomLab/Orgmetra#448` | `6a06062e9d4f6e07bf4780a60384f264f7983353` | Active PR | Draft successor; Foundation CI and SAST are terminal-success, Security Scan is terminal-failure, and CodeQL PR was skipped rather than accepted; qualifying independent approval remains absent and live state must be re-fetched before action |
 
 ## 5. Effective GitHub governance
 

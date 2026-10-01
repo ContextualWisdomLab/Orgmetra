@@ -323,8 +323,8 @@
     },
     {
       "path": "docs/product-technical-gap-baseline.md",
-      "sha256": "915c8402ec0090fe25a6715fb2d0a0251ec109570f30db0e6beb656ec84cd1c7",
-      "bytes": 63913,
+      "sha256": "8e81105f4dc508a5ae65b3760afc3d81bbab93652785b6de1343a242697d7ed4",
+      "bytes": 63940,
       "lines": 250
     },
     {
@@ -383,7 +383,7 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "a12b8a2e7afe5e6f4be3e8e148e358bb93950a7f6e95ec77c7399b049e56c376",
+      "sha256": "657f7a09fbe8851dc2202d9f986eb422c9519a6e05beaf5a6cce88aec96c73b5",
       "bytes": 16903,
       "lines": 429
     },

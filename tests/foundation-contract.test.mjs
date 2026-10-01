@@ -147,7 +147,7 @@ test('commercialization baseline exposes governed evidence, actions, and current
   assert.ok(snapshotRows.length >= 17);
   assert.match(
     snapshot,
-    /\| ORGMETRA-OUTBOX-RECEIPT-01 \| `ContextualWisdomLab\/Orgmetra#448` \| `8f3cc0d7fd217cbc7f3b70431286110bbce71f47` \| Active PR \| Draft successor;/
+    /\| ORGMETRA-OUTBOX-RECEIPT-01 \| `ContextualWisdomLab\/Orgmetra#448` \| `6a06062e9d4f6e07bf4780a60384f264f7983353` \| Active PR \| Draft successor;/
   );
   assert.doesNotMatch(
     snapshot,
