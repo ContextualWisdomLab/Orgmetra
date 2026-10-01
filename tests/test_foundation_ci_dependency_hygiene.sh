@@ -14,6 +14,7 @@ expected_pythonpaths=(
   "packages/migration-adapter/src"
   "packages/naruon-adapter/src"
   "packages/offer-approval/src"
+  "packages/outbox-delivery-receipt/src"
   "packages/requisition-review/src"
   "packages/selection-review/src"
   "services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"

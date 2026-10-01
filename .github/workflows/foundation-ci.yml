@@ -64,6 +64,7 @@ jobs:
           PYTHONPATH=packages/migration-adapter/src COVERAGE_FILE=/tmp/orgmetra-migration-adapter.coverage python -m pytest -c packages/migration-adapter/pyproject.toml packages/migration-adapter/tests
           PYTHONPATH=packages/naruon-adapter/src COVERAGE_FILE=/tmp/orgmetra-naruon-adapter.coverage python -m pytest -c packages/naruon-adapter/pyproject.toml packages/naruon-adapter/tests
           PYTHONPATH=packages/offer-approval/src COVERAGE_FILE=/tmp/orgmetra-offer-approval.coverage python -m pytest -c packages/offer-approval/pyproject.toml packages/offer-approval/tests
+          PYTHONPATH=packages/outbox-delivery-receipt/src COVERAGE_FILE=/tmp/orgmetra-outbox-delivery-receipt.coverage python -m pytest -c packages/outbox-delivery-receipt/pyproject.toml packages/outbox-delivery-receipt/tests
           PYTHONPATH=packages/requisition-review/src COVERAGE_FILE=/tmp/orgmetra-requisition-review.coverage python -m pytest -c packages/requisition-review/pyproject.toml packages/requisition-review/tests
           PYTHONPATH=packages/selection-review/src COVERAGE_FILE=/tmp/orgmetra-selection-review.coverage python -m pytest -c packages/selection-review/pyproject.toml packages/selection-review/tests
           PYTHONPATH=services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-job-analysis-api.coverage python -m pytest -c services/job-analysis-api/pyproject.toml services/job-analysis-api/tests
