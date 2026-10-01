@@ -377,9 +377,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "648533b4aff8cee643df4afc06b463eda788e002e11d043971c8a16804c68501",
-      "bytes": 14943,
-      "lines": 387
+      "sha256": "6780a28b19e395b434766b00f7d274f2e04b5b0e750036f3477e76fb0a84331d",
+      "bytes": 15345,
+      "lines": 398
     },
     {
       "path": "tests/openapi-contract.test.mjs",
