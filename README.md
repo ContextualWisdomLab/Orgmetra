@@ -15,7 +15,7 @@ Traditional HR systems often split job analysis, recruiting, assessment, employm
 | HR source of truth | Distinct Person, Employment, Organization, Job, Position, Assignment, candidate-worker, performance, and validation records |
 | Time-aware HR facts | Separate business-effective time and system-recorded time |
 | Evidence-backed decisions | Explicit evidence and actor context for governed selection and talent workflows |
-| Privacy without unusable masking | Purpose-bound authorization, least privilege, encryption, retention, and audit |
+| Privacy without unusable masking | Purpose-bound authorization, least privilege, encryption, retention, audit, export controls, and field-level access decisions |
 | Scientific validation | Predictor, criterion, sample, and policy-version evidence without replacing psychometric/statistical kernels |
 | Ecosystem integration | Versioned API, event, package, and adapter boundaries instead of cross-service application-table access |
 
@@ -98,7 +98,7 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the code-current architecture bound
 2. Effective time and system-recorded time are preserved independently.
 3. Database objects are normalized to 3NF and use descriptive two-or-more-word `snake_case` names.
 4. Public identifiers are opaque; credentials are never HR person identifiers.
-5. PII required for authorized HR work remains usable. Protection is achieved with purpose-bound authorization, least privilege, encryption, retention, and audit rather than indiscriminate masking.
+5. PII required for authorized HR work remains usable. Protection is achieved with purpose-bound authorization, least privilege, encryption, retention, audit, export controls, and field-level access decisions rather than indiscriminate masking.
 6. LLM output is draft evidence, never an autonomous high-impact employment decision.
 7. Inferred lineage is not authoritative audit history.
 8. No cross-service application-table access.
