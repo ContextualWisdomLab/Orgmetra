@@ -18,10 +18,11 @@ expected_pythonpaths=(
   "packages/selection-review/src"
   "services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"
   "services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"
+  "services/workforce-validation-api/src:packages/keyverse-adapter/src"
 )
 
 if ! grep -Fq -- "${expected_install}" "${workflow_path}"; then
-  printf 'Foundation CI must install only the hash-locked test toolchain.\n' >&2
+  printf 'Foundation CI must install only the hash-locked test/build toolchain.\n' >&2
   exit 1
 fi
 
@@ -72,8 +73,8 @@ if [[ ! -f "${requirements_path}" ]]; then
 fi
 
 mapfile -t package_lines < <(grep -Ev '^[[:space:]]*(#|$)' "${requirements_path}")
-if [[ "${#package_lines[@]}" -ne 7 ]]; then
-  printf 'Foundation CI requirements must contain the seven reviewed direct/runtime test packages.\n' >&2
+if [[ "${#package_lines[@]}" -ne 8 ]]; then
+  printf 'Foundation CI requirements must contain the eight reviewed direct/runtime test-build packages.\n' >&2
   exit 1
 fi
 
@@ -84,7 +85,7 @@ for package_line in "${package_lines[@]}"; do
   fi
 done
 
-for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-cov; do
+for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-cov setuptools; do
   if ! printf '%s\n' "${package_lines[@]}" | grep -Eq "^${package_name}=="; then
     printf 'Foundation CI requirement is missing: %s\n' "${package_name}" >&2
     exit 1

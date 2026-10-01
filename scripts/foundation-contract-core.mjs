@@ -85,6 +85,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_audit_outbox_hardening_postgres.sh',
   'tests/test_candidate_worker_conversion_postgres.sh',
   'tests/test_validity_study_case_postgres.sh',
+  'tests/test_workforce_validation_owner_schema_postgres.sh',
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
