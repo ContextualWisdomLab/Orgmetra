@@ -88,6 +88,7 @@ def _subprocess_environment() -> dict[str, str]:
     environment["PIP_CONFIG_FILE"] = os.devnull
     environment["PIP_NO_INDEX"] = "1"
     environment["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
+    environment["PYTHONWARNINGS"] = "error"
     return environment
 
 
