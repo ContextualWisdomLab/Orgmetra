@@ -5,21 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "7f664425d1307c21f7d26bea40553426b434d141fa2fedaf5ea25e798247878d",
-      "bytes": 4506,
-      "lines": 127
-    },
-    {
-      "path": ".github/workflows/hr-workspace-browser-e2e.yml",
-      "sha256": "62be846657a26725f0381cf8c8c679b5d5da7996b25636230ce11ef6f1805740",
-      "bytes": 1788,
-      "lines": 57
-    },
-    {
-      "path": ".github/workflows/job-analysis-api-quality.yml",
-      "sha256": "352dc78931dd94afea3e88912d38dcc4b562a004112f199f3d7a12d22b6d637a",
-      "bytes": 4159,
-      "lines": 105
+      "sha256": "3957487242e7fe0f80876f001488b5f2baf4e20b9092ea804a7b39deef9e9cc0",
+      "bytes": 6962,
+      "lines": 133
     },
     {
       "path": ".gitignore",
@@ -53,9 +41,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "608ade458c3db8492fc3b5c212f44cb94b9f3ec4b6acfa4c01c9b8065adae9c2",
-      "bytes": 18559,
-      "lines": 83
+      "sha256": "a5f765eb9b1ac6ad0a312b8a4ee244363d96b9c231db52ad4706b9a22ea42cbf",
+      "bytes": 18803,
+      "lines": 84
     },
     {
       "path": "CLAUDE.md",
@@ -83,15 +71,15 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "67cf52bb9104227d32572357c49cebf636494d6fc66fb440f2e415414876b74e",
-      "bytes": 29937,
-      "lines": 446
+      "sha256": "470e3681a84528cf4a05cd3dd5d23d06d09b2a94cc94c8032b8112744a40cb63",
+      "bytes": 29665,
+      "lines": 442
     },
     {
       "path": "apps/hr-workspace/index.html",
-      "sha256": "557f19fd223eb530eddf44280579e80c433b4cca2e95c048d3ef2a473647ee90",
-      "bytes": 19997,
-      "lines": 160
+      "sha256": "94688218fe12a3a2f47cb666abd90f609130f930a5f3f84319ec2ad4d2405434",
+      "bytes": 19897,
+      "lines": 159
     },
     {
       "path": "apps/hr-workspace/styles.css",
@@ -245,8 +233,8 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "7a1301871485181875cd1ef86711659bef575d55267ca74769677bd860dff474",
-      "bytes": 11987,
+      "sha256": "656e05be99ccec6aa40541105af6ed8010d095363811c26d15283d614c772aa2",
+      "bytes": 11979,
       "lines": 42
     },
     {
@@ -335,14 +323,14 @@
     },
     {
       "path": "docs/adr/0011-bitemporal-workforce-composition.md",
-      "sha256": "21bcf0b904c1ddbed74b5e4fa72d553dc30b8bc08abe257ad164ba15f55ad46b",
-      "bytes": 5568,
+      "sha256": "a898da8335f4ea394d89063468b4e0bb00bdc586f8348e222f72f362169318d8",
+      "bytes": 5551,
       "lines": 55
     },
     {
       "path": "docs/adr/0012-governed-migration-handoff.md",
-      "sha256": "ae66a4aa61a34bcee8309a3c34c3d1d440574a55ab536c756b7fb9a5a96ac928",
-      "bytes": 5973,
+      "sha256": "a93fcca51799df9e8166aedc054de3ca15e6f7b8ef9f00e6c78eb964ec00519c",
+      "bytes": 5966,
       "lines": 61
     },
     {
@@ -401,8 +389,8 @@
     },
     {
       "path": "package.json",
-      "sha256": "38b16090f937da29531dbe3c5d5f4392c4a8dc2d485b95e43d9bbdf26c7a9a07",
-      "bytes": 761,
+      "sha256": "8276ab9ab644f8fcc1a6f9ef57636d79f2e39aa8da308f08a5813f9d93fd2983",
+      "bytes": 809,
       "lines": 19
     },
     {
@@ -431,9 +419,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "fe743c4e9e1589b3c99c28e4c05aeedfa8433017061664d63fa57606a651f8c3",
-      "bytes": 28673,
-      "lines": 703
+      "sha256": "d9092b8ade98dfa6c8b43f5e3ea32af6e9cb7ab3868b8768a616767c3016fdd5",
+      "bytes": 28757,
+      "lines": 705
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -443,27 +431,39 @@
     },
     {
       "path": "tests/dispatcher-inventory.test.mjs",
-      "sha256": "09f5e64410e6b7a26bf8d6ce61c50b737da2ea85d955f91eba63aa21f1537261",
-      "bytes": 1597,
-      "lines": 34
+      "sha256": "c1b9a05c82ffdd95fa874a26819f1be47ac2646e391b0cc86d39b0549e9431c5",
+      "bytes": 2160,
+      "lines": 47
+    },
+    {
+      "path": "tests/e2e/hr-workspace-core-model.spec.mjs",
+      "sha256": "b4a328a7756723b0dbdca44d1b6bd2f3240c72751dc1b5f793d4b658c63da329",
+      "bytes": 1319,
+      "lines": 27
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "843547ce03c366cfa6c99d89a04f1a0d075e3debb898a7f082d1e8454af69ee6",
-      "bytes": 12514,
-      "lines": 274
+      "sha256": "e22202da0b8b075be461865656a5166534ea2c584d2b4704365fca4f12c0aacb",
+      "bytes": 15190,
+      "lines": 320
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "e6fdc19a3f2fa32182d1ecf96ed21df6841c376e3b86494c4f4313564f75c2a4",
-      "bytes": 15237,
-      "lines": 395
+      "sha256": "b62bfcab39f1357d29b845c73d2705cf8bd8030abb0b083c9fc48eddf738aa10",
+      "bytes": 15320,
+      "lines": 396
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "20c20e565c6634d2f6875d459ff639b0e174d463ed59e46c862df88b4e6327a8",
-      "bytes": 6148,
-      "lines": 138
+      "sha256": "26b68a01e6e7664689a3b1749ee7c0760b4a41bf0e2278afa5ab017ba76487e2",
+      "bytes": 10026,
+      "lines": 208
+    },
+    {
+      "path": "tests/job-analysis-api-fixture.mjs",
+      "sha256": "7af2654ad70852509bece5e51c88111898168f224eecc501c1910b60a10c3959",
+      "bytes": 1728,
+      "lines": 48
     },
     {
       "path": "tests/openapi-contract.test.mjs",
@@ -506,6 +506,12 @@
       "sha256": "57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7",
       "bytes": 11349,
       "lines": 370
+    },
+    {
+      "path": "tests/test_github_actions_runner_image.py",
+      "sha256": "92c7e84c4b598097e941a949fd4498309b7c8e1167800559a73eee0338991cc1",
+      "bytes": 8207,
+      "lines": 204
     },
     {
       "path": "tests/test_job_analysis_snapshot_postgres.sh",
@@ -551,9 +557,15 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "4b1ab51c21bd8eadd36c9aad03797c081fdd324c3550b63cda37e10a6ec14cea",
-      "bytes": 27817,
-      "lines": 653
+      "sha256": "85a5677706a580776c58c6a6db011a4d4b83e2a6c318a0f1300a601cb90e9924",
+      "bytes": 27905,
+      "lines": 655
+    },
+    {
+      "path": "tests/workspace-foundation-integration.test.mjs",
+      "sha256": "d0e8601345c4c59fe8df361d2eb9f420dc4a71fe1301f6e23692204d35bc57f2",
+      "bytes": 891,
+      "lines": 16
     }
   ]
 }

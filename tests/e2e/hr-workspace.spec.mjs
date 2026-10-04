@@ -1,15 +1,18 @@
 import { expect, test } from '@playwright/test';
+import { jobAnalysisApiFixture } from '../job-analysis-api-fixture.mjs';
+
+const jobAnalysisSnapshot = jobAnalysisApiFixture();
 
 const workspacePath = '/apps/hr-workspace/index.html';
 
 async function injectProtectedReadConfig(page) {
-  await page.addInitScript(() => {
+  await page.addInitScript((snapshot) => {
     const baseUrl = window.location.origin;
     const getAuthorization = () => 'Bearer e2e-host-token';
     window.__ORGMETRA_JOB_ANALYSIS__ = {
       baseUrl,
-      tenantRecordId: 'tenant-e2e',
-      analysisRecordId: 'analysis-e2e',
+      tenantRecordId: snapshot.tenant_record_id,
+      analysisRecordId: snapshot.analysis_record_id,
       purposeCode: 'job_analysis_read',
       getAuthorization,
     };
@@ -22,7 +25,7 @@ async function injectProtectedReadConfig(page) {
       requestedFields: ['display_name', 'employment_status_code'],
       getAuthorization,
     };
-  });
+  }, jobAnalysisSnapshot);
 }
 
 test('human-review workspace states remain keyboard-accessible and localized', async ({ page }) => {
@@ -68,6 +71,57 @@ test('human-review workspace states remain keyboard-accessible and localized', a
   await expect(page.locator('#confirmation-status')).toBeHidden();
   await expect(page.locator('#confirmation-reason')).toHaveValue('');
 });
+
+test('Cancel dismisses correction with an empty required reason', async ({ page }) => {
+  await page.goto(workspacePath);
+  await page.locator('[data-view-link="employee-profile"]').first().click();
+  await page.locator('[data-action="correct-history"]').click();
+  const dialog = page.locator('#confirmation-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#confirmation-reason')).toHaveValue('');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#confirmation-status')).toHaveJSProperty('hidden', true);
+  await expect(dialog).toHaveJSProperty('returnValue', 'cancel');
+});
+
+test('Close dismisses correction with an empty required reason', async ({ page }) => {
+  await page.goto(workspacePath);
+  await page.locator('[data-view-link="employee-profile"]').first().click();
+  await page.locator('[data-action="correct-history"]').click();
+  const dialog = page.locator('#confirmation-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#confirmation-reason')).toHaveValue('');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#confirmation-status')).toHaveJSProperty('hidden', true);
+  await expect(dialog).toHaveJSProperty('returnValue', 'cancel');
+});
+
+for (const { name, reason, valueMissing } of [
+  { name: 'empty', reason: '', valueMissing: true },
+  { name: 'whitespace-only', reason: ' \n\t ', valueMissing: false },
+]) {
+  test(`Confirmation rejects a ${name} correction reason`, async ({ page }) => {
+    await page.goto(workspacePath);
+    await page.locator('[data-view-link="employee-profile"]').first().click();
+    await page.locator('[data-action="correct-history"]').click();
+    const dialog = page.locator('#confirmation-dialog');
+    const reasonInput = page.locator('#confirmation-reason');
+    const confirmButton = page.locator('#confirm-correction');
+    await expect(reasonInput).toHaveJSProperty('required', true);
+    await expect(page.locator('#confirmation-form')).toHaveJSProperty('noValidate', false);
+    await expect(confirmButton).toHaveJSProperty('formNoValidate', false);
+    await reasonInput.fill(reason);
+    await expect(reasonInput).toHaveValue(reason);
+    expect(await reasonInput.evaluate((input) => input.validity.valueMissing)).toBe(valueMissing);
+    await confirmButton.click();
+    await expect(dialog).toBeVisible();
+    await expect(reasonInput).toBeFocused();
+    await expect(page.locator('#confirmation-status')).toHaveJSProperty('hidden', true);
+    await expect(dialog).toHaveJSProperty('returnValue', '');
+  });
+}
 
 test('unconfigured protected reads stay neutral and explain the host next action', async ({ page }) => {
   await page.goto(workspacePath);
@@ -116,15 +170,7 @@ test('connected read views use host authorization and render API evidence', asyn
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        analysis_record_id: 'analysis-e2e',
-        status_code: 'analysis_validated',
-        effective_from: '2026-08-01',
-        recorded_at: '2026-08-18T05:00:00Z',
-        content_digest_sha256: 'a'.repeat(64),
-        tasks: [{ task_id: 'task-e2e' }],
-        ksao_requirements: [{ ksao_id: 'ksao-e2e' }],
-      }),
+      body: JSON.stringify(jobAnalysisSnapshot),
     });
   });
 
@@ -138,8 +184,8 @@ test('connected read views use host authorization and render API evidence', asyn
   await page.locator('[data-view-link="job-analysis"]').first().click();
   await page.getByRole('button', { name: 'Load snapshot' }).click();
   await expect(page.locator('#job-analysis-status')).toHaveAttribute('data-state', 'loaded');
-  await expect(page.locator('#job-analysis-task-count')).toHaveText('1');
-  await expect(page.locator('#job-analysis-ksao-count')).toHaveText('1');
+  await expect(page.locator('#job-analysis-task-count')).toHaveText(String(jobAnalysisSnapshot.tasks.length));
+  await expect(page.locator('#job-analysis-ksao-count')).toHaveText(String(jobAnalysisSnapshot.ksao_requirements.length));
 
   const peopleRequest = requests.find((request) => request.kind === 'people');
   const peopleUrl = new URL(peopleRequest.url);

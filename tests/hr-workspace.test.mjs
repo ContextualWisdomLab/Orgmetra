@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
+import { jobAnalysisApiFixture } from './job-analysis-api-fixture.mjs';
 import {
   fetchJobAnalysisSnapshot,
   fetchPeopleRecord,
@@ -109,6 +111,74 @@ test('Job Analysis uses a host authorization provider without persisting bearer 
   assert.equal(request.options.headers.Authorization, 'Bearer host-provided-token');
   assert.equal(request.options.headers['X-Purpose-Code'], 'job_analysis_read');
   assert.doesNotMatch(html, /localStorage|sessionStorage|authorization.*input/i);
+});
+
+test('Job Analysis renders the authoritative API document without a whole-snapshot digest', async () => {
+  const snapshot = jobAnalysisApiFixture();
+  assert.equal(Object.hasOwn(snapshot, 'content_digest_sha256'), false);
+  assert.equal(snapshot.tasks.length, 3);
+  assert.equal(snapshot.ksao_requirements.length, 3);
+  assert.match(snapshot.tasks[0].source.content_digest_sha256, /^[a-f0-9]{64}$/);
+
+  const payload = await fetchJobAnalysisSnapshot({
+    baseUrl: 'https://job-analysis.example.test',
+    tenantRecordId: snapshot.tenant_record_id,
+    analysisRecordId: snapshot.analysis_record_id,
+    getAuthorization: () => 'Bearer fixture-host-token',
+  }, async () => ({ ok: true, status: 200, json: async () => snapshot }));
+  const nodes = Object.fromEntries([
+    'result', 'analysis-id', 'state', 'effective', 'recorded', 'task-count', 'ksao-count',
+  ].map((suffix) => [`job-analysis-${suffix}`, { textContent: '', hidden: true }]));
+  const context = {
+    document: {
+      getElementById(id) {
+        assert.ok(Object.hasOwn(nodes, id), `unsupported Job Analysis field: ${id}`);
+        return nodes[id];
+      },
+    },
+    snapshot: payload,
+  };
+  for (const name of ['clearJobAnalysisSnapshot', 'renderJobAnalysisSnapshot']) {
+    const source = app.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
+    assert.ok(source, `retained ${name} function must be exercised`);
+    runInNewContext(`${source[0]}\n${name}(${name.startsWith('render') ? 'snapshot' : ''});`, context);
+  }
+  for (const [suffix, expected] of Object.entries({
+    'analysis-id': snapshot.analysis_record_id,
+    state: snapshot.status_code,
+    effective: snapshot.effective_from,
+    recorded: snapshot.recorded_at,
+    'task-count': '3',
+    'ksao-count': '3',
+  })) {
+    assert.match(html, new RegExp(`id="job-analysis-${suffix}"`));
+    assert.equal(nodes[`job-analysis-${suffix}`].textContent, expected);
+  }
+  assert.equal(nodes['job-analysis-result'].hidden, false);
+  assert.doesNotMatch(html, /jobAnalysisDigest|job-analysis-digest/);
+  assert.doesNotMatch(app, /jobAnalysisDigest|job-analysis-digest|content_digest_sha256/);
+});
+
+test('browser Job Analysis mock uses the same authoritative document and retains the canonical timeout', () => {
+  const browser = readFileSync(new URL('./e2e/hr-workspace.spec.mjs', import.meta.url), 'utf8');
+  const config = readFileSync(new URL('../playwright.config.mjs', import.meta.url), 'utf8');
+  assert.match(browser, /import \{ jobAnalysisApiFixture \} from '\.\.\/job-analysis-api-fixture\.mjs'/);
+  assert.match(browser, /const jobAnalysisSnapshot = jobAnalysisApiFixture\(\)/);
+  assert.match(browser, /body: JSON\.stringify\(jobAnalysisSnapshot\)/);
+  assert.doesNotMatch(browser, /content_digest_sha256:|task_id:|ksao_id:/);
+  assert.match(config, /timeout: 15_000/);
+});
+
+test('gap baseline traceability names its active-PR maturity and governing ADR', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  const adr = readFileSync(new URL('../docs/adr/0026-product-technical-gap-baseline.md', import.meta.url), 'utf8');
+  const row = traceability.split('\n').filter((line) => line.startsWith('| Product and technical gap baseline |'));
+  assert.equal(row.length, 1, 'the gap baseline has one source-contract row');
+  const cells = row[0].split('|').map((cell) => cell.trim());
+  assert.match(adr, /^# ADR 0026: Product and technical gap baseline/m);
+  assert.match(adr, /`docs\/product-technical-gap-baseline\.md` is the current evidence ledger/);
+  assert.equal(cells[6], 'implemented_on_active_pr', 'local candidate documentation is not protected truth');
+  assert.equal(cells[5], 'ADR-0026', 'the baseline is not governed by the workspace ADR');
 });
 
 test('People API uses host authorization and an explicit no-storage read boundary', async () => {

@@ -42,6 +42,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Consolidated repository-owned PR validation from twelve workflows into one Foundation CI job, while keeping the dual-cluster recovery rehearsal separately path-scoped. Central required review and security workflows remain organization-owned.
 - Aligned the English/Korean locale toggle's accessible name with its visible target-language label (`한국어` / `English`) and added exact browser assertions for both language states, following WCAG 2.2 Success Criterion 2.5.3 (Label in Name); the APA 7 W3C citation remains in `docs/doctoring/REFERENCES.md`.
 - Reconciled README, traceability, ADR status/index, and changelog maturity claims with capabilities already integrated on protected `develop`; open-PR capabilities remain explicitly non-shipped.
 - New predictive-validity membership must use one normalized worker-level case; the three independent validity-study decision/evidence/outcome link relations are historical read surfaces only and can no longer accept new rows. A case insert also rejects a criterion observation whose recorded interval is already closed at `linked_at`.

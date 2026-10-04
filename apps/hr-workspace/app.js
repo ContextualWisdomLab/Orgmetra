@@ -28,7 +28,6 @@ Object.assign(translations.en, {
   jobAnalysisStatus: 'Status',
   jobAnalysisEffective: 'Effective from',
   jobAnalysisRecorded: 'Recorded at',
-  jobAnalysisDigest: 'Content digest',
   jobAnalysisTasks: 'Tasks',
   jobAnalysisKsaos: 'KSAO requirements',
   jobAnalysisNoValues: 'No snapshot values loaded.',
@@ -72,7 +71,6 @@ Object.assign(translations.ko, {
   jobAnalysisStatus: '상태',
   jobAnalysisEffective: '효력 시작일',
   jobAnalysisRecorded: '기록 시각',
-  jobAnalysisDigest: '콘텐츠 다이제스트',
   jobAnalysisTasks: '과업',
   jobAnalysisKsaos: 'KSAO 요구사항',
   jobAnalysisNoValues: '불러온 스냅샷 값이 없습니다.',
@@ -289,7 +287,6 @@ function clearJobAnalysisSnapshot() {
   document.getElementById('job-analysis-state').textContent = 'unknown';
   document.getElementById('job-analysis-effective').textContent = 'unknown';
   document.getElementById('job-analysis-recorded').textContent = 'unknown';
-  document.getElementById('job-analysis-digest').textContent = 'unknown';
   document.getElementById('job-analysis-task-count').textContent = '0';
   document.getElementById('job-analysis-ksao-count').textContent = '0';
 }
@@ -302,7 +299,6 @@ function renderJobAnalysisSnapshot(snapshot) {
   document.getElementById('job-analysis-state').textContent = snapshot?.status_code || 'unknown';
   document.getElementById('job-analysis-effective').textContent = snapshot?.effective_from || 'unknown';
   document.getElementById('job-analysis-recorded').textContent = snapshot?.recorded_at || 'unknown';
-  document.getElementById('job-analysis-digest').textContent = snapshot?.content_digest_sha256 || 'unknown';
   document.getElementById('job-analysis-task-count').textContent = String(tasks.length);
   document.getElementById('job-analysis-ksao-count').textContent = String(ksaos.length);
   result.hidden = false;

@@ -131,7 +131,6 @@
               <tr><th scope="row" data-i18n="jobAnalysisStatus">Status</th><td id="job-analysis-state">unknown</td></tr>
               <tr><th scope="row" data-i18n="jobAnalysisEffective">Effective from</th><td id="job-analysis-effective">unknown</td></tr>
               <tr><th scope="row" data-i18n="jobAnalysisRecorded">Recorded at</th><td id="job-analysis-recorded">unknown</td></tr>
-              <tr><th scope="row" data-i18n="jobAnalysisDigest">Content digest</th><td id="job-analysis-digest">unknown</td></tr>
               <tr><th scope="row" data-i18n="jobAnalysisTasks">Tasks</th><td id="job-analysis-task-count">0</td></tr>
               <tr><th scope="row" data-i18n="jobAnalysisKsaos">KSAO requirements</th><td id="job-analysis-ksao-count">0</td></tr>
             </tbody></table></div>
@@ -149,11 +148,11 @@
 
     <dialog id="confirmation-dialog" class="dialog" aria-labelledby="confirmation-dialog-title">
       <form method="dialog" id="confirmation-form">
-        <div class="dialog-heading"><div><p class="eyebrow" data-i18n="highImpactConfirmation">High-impact confirmation</p><h2 id="confirmation-dialog-title" data-i18n="correctHistoryTitle">Correct history</h2></div><button class="dialog-close" type="submit" value="cancel" aria-label="Close" data-i18n-aria-label="close">×</button></div>
+        <div class="dialog-heading"><div><p class="eyebrow" data-i18n="highImpactConfirmation">High-impact confirmation</p><h2 id="confirmation-dialog-title" data-i18n="correctHistoryTitle">Correct history</h2></div><button class="dialog-close" type="submit" value="cancel" formnovalidate aria-label="Close" data-i18n-aria-label="close">×</button></div>
         <p class="panel-copy" data-i18n="confirmationCopy">A correction remains a draft until a human confirms the actor, purpose, reason, and evidence context.</p>
         <div class="form-grid"><label class="field-label" for="confirmation-actor"><span data-i18n="actor">Actor</span><input id="confirmation-actor" value="HR operations reviewer" readonly></label><label class="field-label" for="confirmation-purpose"><span data-i18n="purpose">Purpose</span><input id="confirmation-purpose" value="HR operations" readonly></label><label class="field-label field-wide" for="confirmation-reason"><span data-i18n="reason">Reason</span><textarea id="confirmation-reason" required rows="3" placeholder="Required" data-i18n-placeholder="reasonPlaceholder"></textarea></label></div>
         <div id="confirmation-status" class="notice notice-success" role="status" hidden data-i18n="draftConfirmed">Draft correction confirmed for local fixture evidence; no API mutation was sent.</div>
-        <div class="dialog-actions"><button class="button button-secondary" type="submit" value="cancel" data-i18n="cancel">Cancel</button><button class="button button-review" id="confirm-correction" type="submit" value="confirm" data-i18n="confirm">Confirm correction</button></div>
+        <div class="dialog-actions"><button class="button button-secondary" type="submit" value="cancel" formnovalidate data-i18n="cancel">Cancel</button><button class="button button-review" id="confirm-correction" type="submit" value="confirm" data-i18n="confirm">Confirm correction</button></div>
       </form>
     </dialog>
   </body>

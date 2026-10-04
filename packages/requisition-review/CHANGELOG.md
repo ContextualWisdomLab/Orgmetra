@@ -8,7 +8,7 @@
 - Separate Job and optional Position references, with an exact Position restricted to one opening.
 - Versioned job-requirements and headcount-authorization references without copying source-system payloads.
 - Deterministic canonical JSON and SHA-256 correlation evidence.
-- Exact 100% owned production statement and branch coverage requirement through Requisition Review Quality.
+- Exact 100% owned production statement and branch coverage requirement through Foundation CI.
 
 ### Security and privacy
 

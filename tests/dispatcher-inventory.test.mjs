@@ -22,6 +22,19 @@ function pythonRequiredFiles() {
   return new Set([...match[1].matchAll(/^\s+"([^"]+)",$/gm)].map((item) => item[1]));
 }
 
+test('workspace contract support and retained integration guards are provenance-required', () => {
+  const nodeRequired = new Set(REQUIRED_FILES);
+  const pythonRequired = pythonRequiredFiles();
+  for (const filePath of [
+    'tests/job-analysis-api-fixture.mjs',
+    'tests/test_github_actions_runner_image.py',
+    'tests/e2e/hr-workspace-core-model.spec.mjs',
+  ]) {
+    assert.equal(nodeRequired.has(filePath), true, `Node inventory omitted ${filePath}`);
+    assert.equal(pythonRequired.has(filePath), true, `Python inventory omitted ${filePath}`);
+  }
+});
+
 test('every migration and executable PostgreSQL contract is provenance-required', () => {
   const nodeRequired = new Set(REQUIRED_FILES);
   const pythonRequired = pythonRequiredFiles();

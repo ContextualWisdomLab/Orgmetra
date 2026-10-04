@@ -4,22 +4,36 @@ on:
   pull_request:
     branches:
       - develop
+    paths:
+      - ".github/scripts/restore-rehearsal-postgres.sh"
+      - ".github/workflows/recovery-rehearsal-quality.yml"
+      - "database/migrations/**"
+      - "docs/traceability/restore-rehearsal.md"
+      - "recovery-manifest.json"
+      - "tests/recovery-rehearsal.test.mjs"
   push:
     branches:
       - develop
+    paths:
+      - ".github/scripts/restore-rehearsal-postgres.sh"
+      - ".github/workflows/recovery-rehearsal-quality.yml"
+      - "database/migrations/**"
+      - "docs/traceability/restore-rehearsal.md"
+      - "recovery-manifest.json"
+      - "tests/recovery-rehearsal.test.mjs"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: recovery-rehearsal-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: recovery-rehearsal-quality-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   restore-rehearsal:
     name: PostgreSQL restore rehearsal
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       source_postgres:
