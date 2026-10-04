@@ -81,7 +81,9 @@ Job evidence
 
 Active PR #53 includes local People and Job Analysis read views. Editing their
 request fields clears displayed values and invalidates pending responses, even
-if an edit is reverted. Node and Chromium regressions cover this display
-boundary; they do not establish released authentication or deployment.
+if an edit is reverted. Changing the fixture's personal-details purpose also
+clears its prior allowed or denied display; only an explicit review shows a new
+outcome. Node and Chromium regressions cover these display boundaries; they do
+not establish released authentication or deployment.
 
 Protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, normalized worker-bound validity studies, criterion-observation scope, the governed Naruon intent adapter, requisition review packets, the governed People mutation/confirmed-hire implementation with tenant-scoped idempotency and atomic audit/outbox evidence, and canonical persisted Job Analysis through migration `0013` and the protected Job Analysis API. Workforce-composition evidence remains active PR #54 rather than protected truth. The next protected product gaps are a connected and released browser workspace, statistical validity estimation, and a versioned release; see `docs/product-technical-gap-baseline.md` for exact evidence boundaries and current PR state.

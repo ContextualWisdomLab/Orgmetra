@@ -359,6 +359,29 @@ for (const fixture of [
   });
 }
 
+test('personal-details purpose edits clear prior review states without granting access', async ({ page }) => {
+  await page.goto(workspacePath);
+  await page.locator('[data-view-link="employee-profile"]').first().click();
+  const purpose = page.locator('#access-purpose');
+  const review = page.locator('[data-action="view-personal-details"]');
+  const details = page.locator('#details-panel');
+  const denial = page.locator('#permission-panel');
+  await review.click();
+  await expect(details).toBeVisible();
+  await purpose.selectOption('recruiting');
+  await expect(details).toBeHidden();
+  await expect(denial).toBeHidden();
+  await review.click();
+  await expect(denial).toBeVisible();
+  await expect(details).toBeHidden();
+  await purpose.selectOption('hr_operations');
+  await expect(denial).toBeHidden();
+  await expect(details).toBeHidden();
+  await review.click();
+  await expect(details).toBeVisible();
+  await expect(denial).toBeHidden();
+});
+
 test('keyboard users can bypass repeated workspace navigation', async ({ page }) => {
   await page.goto(workspacePath);
 

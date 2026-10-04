@@ -242,6 +242,29 @@ function protectedReadWorkspace() {
   return { node, pending };
 }
 
+test('personal-details purpose edits clear the previous access result until an explicit review', () => {
+  for (const eventType of ['input', 'change']) {
+    const { node } = protectedReadWorkspace();
+    const purpose = node('access-purpose');
+    const review = node('[data-action="view-personal-details"]');
+    purpose.value = 'hr_operations';
+    review.handlers.click();
+    assert.equal(node('details-panel').hidden, false, 'the permitted fixture review must show its result');
+    purpose.value = 'recruiting';
+    purpose.handlers[eventType]?.({ target: purpose });
+    assert.equal(node('details-panel').hidden, true, `${eventType}: the previous purpose result must not remain visible`);
+    assert.equal(node('permission-panel').hidden, true, 'editing is not a new denied review');
+    review.handlers.click();
+    assert.equal(node('permission-panel').hidden, false, 'an explicit denied review must still explain the refusal');
+    purpose.value = 'hr_operations';
+    purpose.handlers[eventType]?.({ target: purpose });
+    assert.equal(node('permission-panel').hidden, true, 'the previous denial must also be invalidated');
+    assert.equal(node('details-panel').hidden, true, 'returning to a permitted purpose does not perform a review');
+    review.handlers.click();
+    assert.equal(node('details-panel').hidden, false, 'a fresh explicit permitted review must recover');
+  }
+});
+
 const protectedReadCases = [
   {
     kind: 'People', form: 'people-api-form', result: 'people-api-result', status: 'people-api-status',

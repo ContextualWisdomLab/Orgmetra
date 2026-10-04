@@ -67,7 +67,9 @@ API and browser E2E evidence are merged and released. On the active UI PR,
 editing a People or Job Analysis request field must clear the previously
 shown protected values and invalidate a pending response, even if the user
 restores the old field value. Only a fresh explicit read may display values
-for the current request.
+for the current request. Changing the fixture's personal-details access purpose
+must also hide its prior allowed or denied outcome. Selecting a purpose does not
+perform a review; the user must explicitly request the next outcome.
 
 ### P2 scale
 

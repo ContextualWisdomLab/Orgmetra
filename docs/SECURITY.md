@@ -48,6 +48,10 @@ cancels the request already sent nor replaces authoritative API authorization.
 A fresh explicit read still uses the existing host-provided credential and
 cookie-free transport. Synthetic Node and Chromium regressions are local
 boundary evidence, not released authentication or deployment acceptance.
+The fixture's personal-details purpose selector also clears both prior allowed
+and denied display states on input or change. Changing or restoring a purpose
+never grants access or performs a new review. This fixture display rule does not
+claim authoritative authorization, audit persistence, or a protected-value read.
 
 ## Mutation security contract
 

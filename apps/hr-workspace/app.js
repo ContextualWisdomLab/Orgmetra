@@ -340,6 +340,13 @@ if (typeof document !== 'undefined') {
   });
   document.querySelectorAll('[data-open-dialog]').forEach((button) => button.addEventListener('click', () => openDialog(button.dataset.openDialog)));
   document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => closeDialog(button.dataset.closeDialog)));
+  // A changed purpose needs a new explicit review; neither prior outcome remains current.
+  const invalidatePersonalDetailsReview = () => {
+    document.getElementById('permission-panel').hidden = true;
+    document.getElementById('details-panel').hidden = true;
+  };
+  document.getElementById('access-purpose').addEventListener('input', invalidatePersonalDetailsReview);
+  document.getElementById('access-purpose').addEventListener('change', invalidatePersonalDetailsReview);
   document.querySelector('[data-action="view-personal-details"]').addEventListener('click', () => {
     const authorized = isPurposeAuthorized(document.getElementById('access-purpose').value);
     document.getElementById('permission-panel').hidden = authorized;
