@@ -55,8 +55,17 @@ account, tenant, or effective authority, including sign-out and revocation.
 It grants no access and does not infer identity from credentials or form inputs.
 Host notification timing, coherent provider/coordinates, and release integration
 remain separate requirements; otherwise the host must destroy the document.
-Transport cancellation and preventing post-transition dispatch from a helper
-awaiting credentials are not established by this display fence.
+The workspace submit handlers also pass their existing generation check to the
+read helpers. After credential acquisition and before invoking fetch, an obsolete
+submission is rejected and settles quietly through the existing version-fenced
+catch; it cannot dispatch or clear a newer read. Input/change, edit-and-revert,
+authority notification (including repeated or away-and-back notification), and a
+newer submit invalidate credential-waiting submissions. The exported helpers
+retain their two-argument behavior: a direct caller without a generation guard
+has no such dispatch protection. Already-dispatched transport is not cancelled;
+its response and body outcomes retain the existing display fences. This local
+Node seam does not establish host notification timing, actual issuer revocation,
+identity integration, hosted CI, independent approval, or protected release.
 The fixture's personal-details purpose selector also clears both prior allowed
 and denied display states on input or change. Changing or restoring a purpose
 never grants access or performs a new review. This fixture display rule does not

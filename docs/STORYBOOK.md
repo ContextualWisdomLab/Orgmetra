@@ -75,9 +75,17 @@ Use the original configuration objects/providers; replacing bootstrap globals is
 not reconfiguration. Destroy and recreate the document if those objects must be
 replaced or reliable notification is unavailable. Sign-out, revocation, repeated
 notifications, and away-and-back transitions must not revive prior results.
-This display contract does not cancel transport or prevent a helper awaiting
-credentials from later dispatching. Actual host notification and released
-identity integration remain unverified.
+The workspace submit handlers check their existing generation after credential
+acquisition and before fetch: an invalidated credential-waiting submission does
+not dispatch and settles without changing the newer read. This includes input
+or change with reversion, repeated or away-and-back authority notifications, and
+newer submissions. Direct helper callers that omit the optional generation guard
+retain the original two-argument behavior, without this dispatch protection.
+Already-dispatched transport is not cancelled; existing response/body display
+fences remain. The new regression evidence is a synthetic Node handler seam,
+not a new native-browser run. Actual host notification, issuer revocation,
+identity integration, hosted CI, independent approval, and protected release
+remain unverified.
 
 ## Local Storybook runtime
 

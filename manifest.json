@@ -42,9 +42,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "60ba21593d6d5eb2948692656636536701cd314ecd0ec9f597ff6e3513428427",
-      "bytes": 23377,
-      "lines": 96
+      "sha256": "b6c745a056622a3bdcbb48d74feecb92943309494ac74fa9416c31aae9d46df4",
+      "bytes": 24280,
+      "lines": 98
     },
     {
       "path": "CLAUDE.md",
@@ -72,9 +72,9 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "503a8ab2d3f06cb3fd470e9d744cbd5fa04189fdca9402fa2c8fe4406438c448",
-      "bytes": 31342,
-      "lines": 476
+      "sha256": "2ed60b1e5d76592a5fab1fce978789643644894d551d001668620b95989c9929",
+      "bytes": 32014,
+      "lines": 480
     },
     {
       "path": "apps/hr-workspace/index.html",
@@ -204,9 +204,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "57b454d3e561ece4612452c435d5ff2bf413e9676e9ab0ef768efbc144932475",
-      "bytes": 12777,
-      "lines": 87
+      "sha256": "ed7fc75a07ff29ca5019f2dce0f1acf61e317b9725f89d1f07034e7e34ebcad3",
+      "bytes": 13509,
+      "lines": 96
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -216,9 +216,9 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "cd5dcfaa064c7e3b559487880cdea8bb536dbf336ee53e0f275e16f539995b57",
-      "bytes": 4512,
-      "lines": 99
+      "sha256": "d3d630bf1bc67664a419d28fdc3ba1e5fa1dc419747869c426f7fe196212374f",
+      "bytes": 5123,
+      "lines": 107
     },
     {
       "path": "docs/TEST_STRATEGY.md",
@@ -456,9 +456,9 @@
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "7c92782f132e182058c14eded8f0aca6406abb9fd7d106bf32347d66bacc4b23",
-      "bytes": 21078,
-      "lines": 413
+      "sha256": "4589ffd8afa5f8afcb0ed725a54b60b8fe6270b7c5ea08805ebd301aa655c446",
+      "bytes": 26479,
+      "lines": 501
     },
     {
       "path": "tests/job-analysis-api-fixture.mjs",

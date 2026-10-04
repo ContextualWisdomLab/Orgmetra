@@ -305,6 +305,94 @@ const protectedReadCases = [
 ];
 
 for (const fixture of protectedReadCases) {
+  for (const transition of [
+    'authority', 'repeated-authority', 'authority-away-back', 'newer-submit',
+    ...fixture.coordinates.flatMap((coordinate) => ['input', 'change'].map((eventType) => `${coordinate}/${eventType}`)),
+  ]) {
+    for (const outcome of ['credential', 'provider-rejection', 'no-credential']) {
+      test(`${fixture.kind} credential wait: ${transition}/${outcome} cannot dispatch or overwrite a newer read`, async () => {
+        const { node, context } = protectedReadWorkspace();
+        const host = fixture.kind === 'People' ? context.__ORGMETRA_PEOPLE__ : context.__ORGMETRA_JOB_ANALYSIS__;
+        let releaseCredential;
+        let rejectCredential;
+        const heldCredential = new Promise((resolve, reject) => {
+          releaseCredential = resolve;
+          rejectCredential = reject;
+        });
+        const providerCoordinates = [];
+        host.getAuthorization = function () {
+          providerCoordinates.push({
+            tenant: this.tenantRecordId,
+            record: this.personRecordId || this.analysisRecordId,
+          });
+          return providerCoordinates.length === 1 ? heldCredential : 'Bearer current-fixture-only';
+        };
+        const freshPayload = fixture.kind === 'People'
+          ? { fields: { display_name: 'Current credential worker', employment_status_code: 'active' } }
+          : { ...fixture.payload, analysis_record_id: 'current-credential-analysis', tasks: [1], ksao_requirements: [1] };
+        const sent = [];
+        context.fetch = async (url, options) => {
+          assert.equal(options.credentials, 'omit');
+          if (fixture.kind === 'Job Analysis') assert.equal(options.headers['X-Purpose-Code'], host.purposeCode);
+          // Synthetic headers are inspected here, never copied into retained observations.
+          assert.ok(['Bearer current-fixture-only', 'Bearer obsolete-fixture-only'].includes(options.headers.Authorization));
+          sent.push(url);
+          return { status: 200, ok: true, json: async () => freshPayload };
+        };
+        const form = node(fixture.form);
+        const submit = () => form.handlers.submit({ preventDefault() {} });
+        const previous = submit();
+        assert.equal(providerCoordinates.length, 1, 'the real handler must enter the held provider');
+        assert.equal(sent.length, 0, 'credential acquisition is not transport admission');
+        const invalidate = node('document').handlers['orgmetra:authority-invalidated'];
+        if (transition === 'authority' || transition === 'repeated-authority') {
+          invalidate();
+          if (transition === 'repeated-authority') invalidate();
+        } else if (transition === 'authority-away-back') {
+          invalidate();
+          host.tenantRecordId = 'away-tenant';
+          invalidate();
+          host.tenantRecordId = 'tenant-fixture';
+        } else if (transition !== 'newer-submit') {
+          const [coordinate, eventType] = transition.split('/');
+          const input = node(coordinate);
+          const original = input.value;
+          input.value = 'changed-coordinate';
+          form.handlers[eventType]({ target: input });
+          input.value = original;
+          form.handlers[eventType]({ target: input });
+        }
+        if (transition !== 'newer-submit') {
+          assert.equal(node(fixture.result).hidden, true);
+          assert.equal(node(fixture.clearedField).textContent, 'unknown');
+          assert.equal(node(fixture.status).dataset.state, 'idle');
+        }
+        assert.equal(sent.length, 0, 'invalidation and coordinate reversion cannot perform a read');
+        await submit();
+        assert.equal(sent.length, 1, 'the new explicit current read must dispatch exactly once');
+        const expectedUrl = fixture.kind === 'People' ? peopleRecordUrl(host) : jobAnalysisSnapshotUrl(host);
+        assert.equal(sent[0], expectedUrl, 'the original provider and request coordinates must be retained');
+        assert.deepEqual(providerCoordinates, [
+          { tenant: 'tenant-fixture', record: fixture.kind === 'People' ? 'person-fixture' : 'analysis-fixture' },
+          { tenant: 'tenant-fixture', record: fixture.kind === 'People' ? 'person-fixture' : 'analysis-fixture' },
+        ]);
+        const currentValue = node(fixture.clearedField).textContent;
+        const currentStatus = node(fixture.status).textContent;
+        assert.equal(currentValue, fixture.kind === 'People' ? 'Current credential worker' : 'current-credential-analysis');
+        assert.equal(node(fixture.result).hidden, false, 'the nonempty current authorized result must render');
+        if (fixture.kind === 'Job Analysis') assert.equal(node('job-analysis-task-count').textContent, '1');
+        if (outcome === 'provider-rejection') rejectCredential(new Error('synthetic provider failure'));
+        else releaseCredential(outcome === 'no-credential' ? '' : 'Bearer obsolete-fixture-only');
+        await previous;
+        assert.equal(sent.length, 1, 'obsolete credential-waiting submission must send zero requests');
+        assert.equal(node(fixture.result).hidden, false, 'obsolete settlement must not clear the newest read');
+        assert.equal(node(fixture.clearedField).textContent, currentValue);
+        assert.equal(node(fixture.status).textContent, currentStatus);
+        assert.equal(node(fixture.status).dataset.state, 'loaded');
+      });
+    }
+  }
+
   test(`${fixture.kind} authority invalidation fences old response outcomes and preserves fresh reads`, async () => {
     for (const outcome of ['success', 'body', 'denial', 'body-error']) {
       const { node, pending, context } = protectedReadWorkspace();

@@ -136,10 +136,11 @@ export function jobAnalysisSnapshotUrl(config) {
  * The credential is used only for this request and is never persisted by the workspace.
  * @param {{getAuthorization: Function, purposeCode?: string} & Record<string, unknown>} config Protected-read configuration.
  * @param {typeof fetch} fetchImpl Fetch implementation, injectable for tests.
+ * @param {() => boolean} isCurrentRequest Synchronous workspace-generation check before dispatch; omitted callers have no generation fence.
  * @returns {Promise<object>} Parsed snapshot payload.
- * @throws {Error} For missing authorization providers/credentials, unavailable fetch, denied access, or failed requests.
+ * @throws {Error} For missing authorization providers/credentials, unavailable fetch, obsolete guarded reads, denied access, or failed requests.
  */
-export async function fetchJobAnalysisSnapshot(config, fetchImpl = globalThis.fetch) {
+export async function fetchJobAnalysisSnapshot(config, fetchImpl = globalThis.fetch, isCurrentRequest = () => true) {
   if (typeof config?.getAuthorization !== 'function') {
     throw new Error('Job Analysis API authorization provider is not configured.');
   }
@@ -148,6 +149,7 @@ export async function fetchJobAnalysisSnapshot(config, fetchImpl = globalThis.fe
   if (typeof authorization !== 'string' || !authorization.trim()) {
     throw new Error('Job Analysis API authorization provider returned no credential.');
   }
+  if (!isCurrentRequest()) throw new Error('OBSOLETE_WORKSPACE_READ');
   const response = await fetchImpl(jobAnalysisSnapshotUrl(config), {
     headers: {
       Authorization: authorization,
@@ -196,10 +198,11 @@ export function peopleRecordUrl(config) {
  * The credential is used only for this request and is never persisted by the workspace.
  * @param {{getAuthorization: Function} & Record<string, unknown>} config Protected-read configuration.
  * @param {typeof fetch} fetchImpl Fetch implementation, injectable for tests.
+ * @param {() => boolean} isCurrentRequest Synchronous workspace-generation check before dispatch; omitted callers have no generation fence.
  * @returns {Promise<object>} Parsed People record payload.
- * @throws {Error} For missing authorization providers/credentials, unavailable fetch, denied access, or failed requests.
+ * @throws {Error} For missing authorization providers/credentials, unavailable fetch, obsolete guarded reads, denied access, or failed requests.
  */
-export async function fetchPeopleRecord(config, fetchImpl = globalThis.fetch) {
+export async function fetchPeopleRecord(config, fetchImpl = globalThis.fetch, isCurrentRequest = () => true) {
   if (typeof config?.getAuthorization !== 'function') {
     throw new Error('People API authorization provider is not configured.');
   }
@@ -208,6 +211,7 @@ export async function fetchPeopleRecord(config, fetchImpl = globalThis.fetch) {
   if (typeof authorization !== 'string' || !authorization.trim()) {
     throw new Error('People API authorization provider returned no credential.');
   }
+  if (!isCurrentRequest()) throw new Error('OBSOLETE_WORKSPACE_READ');
   const response = await fetchImpl(peopleRecordUrl(config), {
     headers: { Authorization: authorization },
     credentials: 'omit',
@@ -406,7 +410,7 @@ if (typeof document !== 'undefined') {
     };
     setJobAnalysisStatus('jobAnalysisLoading', 'loading');
     try {
-      const snapshot = await fetchJobAnalysisSnapshot(config);
+      const snapshot = await fetchJobAnalysisSnapshot(config, globalThis.fetch, () => requestVersion === jobAnalysisRequestVersion);
       if (requestVersion !== jobAnalysisRequestVersion) return;
       renderJobAnalysisSnapshot(snapshot);
       setJobAnalysisStatus('jobAnalysisLoaded', 'loaded');
@@ -458,7 +462,7 @@ if (typeof document !== 'undefined') {
     };
     setPeopleApiStatus('peopleApiLoading', 'loading');
     try {
-      const record = await fetchPeopleRecord(config);
+      const record = await fetchPeopleRecord(config, globalThis.fetch, () => requestVersion === peopleApiRequestVersion);
       if (requestVersion !== peopleApiRequestVersion) return;
       renderPeopleRecord(record);
       setPeopleApiStatus('peopleApiLoaded', 'loaded');
