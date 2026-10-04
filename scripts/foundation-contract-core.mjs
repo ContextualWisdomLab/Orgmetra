@@ -110,7 +110,6 @@ export const REQUIRED_FILES = Object.freeze([
 /** Exact maturity vocabulary accepted by traceability tables. */
 export const MATURITY_VALUES = Object.freeze(new Set([
   'implemented_on_protected_develop',
-  'implemented_on_protected_main',
   'implemented_on_active_pr',
   'accepted_architecture',
   'planned',

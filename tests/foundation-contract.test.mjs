@@ -412,6 +412,63 @@ test('foundation validator accepts ordinary prose containing placeholder vocabul
   }
 });
 
+test('current traceability bounds maturity to source evidence without attesting protection', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  for (const section of ['2. Product traceability matrix', '4. CWL integration traceability']) {
+    const cells = extractMaturityCells(extractSection(traceability, section));
+    assert.ok(cells.length > 0, `${section}: the actual matrix must be inspected`);
+    assert.equal(cells.some((cell) => cell.startsWith('implemented_on_protected_')), false,
+      'a current protected classification requires evidence not captured in this source assessment');
+  }
+  assert.match(traceability, /develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f/);
+  assert.match(traceability, /not a claim that implementation is new or absent from the default-branch base/);
+  const keyverseRow = traceability.split('\n').filter((line) => line.startsWith('| Keyverse identity and authorization |'));
+  assert.equal(keyverseRow.length, 1);
+  assert.equal(keyverseRow[0].split('|').at(-2).trim(), 'accepted_architecture');
+  assert.match(keyverseRow[0], /issuer integration remains unverified here/);
+});
+
+test('foundation validator rejects obsolete protected-main maturity in otherwise-valid matrices', () => {
+  const root = temporaryDirectory();
+  try {
+    makeMinimalValidFoundation(root);
+    const original = readFileSync(join(root, 'docs/TRACEABILITY.md'), 'utf8');
+    const currentValues = [
+      'implemented_on_protected_develop',
+      'implemented_on_active_pr',
+      'accepted_architecture',
+      'planned',
+      'research_only',
+      'superseded',
+      'out_of_scope'
+    ];
+    for (const originalValue of ['accepted_architecture', 'planned']) {
+      for (const currentValue of currentValues) {
+        write(root, 'docs/TRACEABILITY.md', original.replace(
+          `| ${originalValue} |`, `| ${currentValue} |`
+        ));
+        assert.deepEqual(validateFoundation(root), [], `${originalValue}: ${currentValue}`);
+      }
+      const legacy = original.replace(
+        `| ${originalValue} |`, '| implemented_on_protected_main |'
+      );
+      const sectionName = originalValue === 'accepted_architecture'
+        ? '2. Product traceability matrix' : '4. CWL integration traceability';
+      assert.deepEqual(extractMaturityCells(extractSection(legacy, sectionName)), [
+        'implemented_on_protected_main'
+      ], 'the legacy row must reach the canonical maturity consumer');
+      write(root, 'docs/TRACEABILITY.md', legacy);
+      assert.deepEqual(validateFoundation(root), [
+        'docs/TRACEABILITY.md: invalid maturity value: implemented_on_protected_main'
+      ], `${sectionName}: obsolete maturity must be the only rejection`);
+      write(root, 'docs/TRACEABILITY.md', original);
+      assert.deepEqual(validateFoundation(root), [], 'restoring the valid row must restore admission');
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('foundation validator reports missing traceability sections', () => {
   const root = temporaryDirectory();
   try {
