@@ -224,6 +224,7 @@ function protectedReadWorkspace() {
     document: {
       documentElement: { dataset: {}, lang: '' },
       getElementById: node, querySelector: node, querySelectorAll: () => [],
+      addEventListener(type, callback) { node('document').addEventListener(type, callback); },
     },
     __ORGMETRA_PEOPLE__: {
       baseUrl: 'https://people.example.test', tenantRecordId: 'tenant-fixture',
@@ -239,7 +240,7 @@ function protectedReadWorkspace() {
     fetch: () => new Promise((resolve) => pending.push(resolve)),
   };
   runInNewContext(app.replace(/^export /gm, ''), context);
-  return { node, pending };
+  return { node, pending, context };
 }
 
 test('personal-details purpose edits clear the previous access result until an explicit review', () => {
@@ -265,6 +266,29 @@ test('personal-details purpose edits clear the previous access result until an e
   }
 });
 
+test('host authority invalidation synchronously clears both loaded read surfaces', async () => {
+  const { node, pending } = protectedReadWorkspace();
+  const people = node('people-api-form').handlers.submit({ preventDefault() {} });
+  const job = node('job-analysis-form').handlers.submit({ preventDefault() {} });
+  await Promise.resolve();
+  assert.equal(pending.length, 2);
+  pending[0]({ status: 200, ok: true, json: async () => ({ fields: { display_name: 'Previous authority', employment_status_code: 'active' } }) });
+  pending[1]({ status: 200, ok: true, json: async () => ({ analysis_record_id: 'previous-analysis', status_code: 'approved', effective_from: '2026-10-04', recorded_at: 'previous-cutoff', tasks: [1], ksao_requirements: [1] }) });
+  await Promise.all([people, job]);
+  assert.equal(node('people-api-result').hidden, false);
+  assert.equal(node('job-analysis-result').hidden, false);
+  node('document').handlers['orgmetra:authority-invalidated']?.();
+  for (const prefix of ['people-api', 'job-analysis']) {
+    assert.equal(node(`${prefix}-result`).hidden, true, `${prefix}: the old authority's result must be hidden synchronously`);
+    assert.equal(node(`${prefix}-status`).dataset.state, 'idle');
+  }
+  for (const id of ['people-api-display-name', 'people-api-employment-status', 'job-analysis-analysis-id', 'job-analysis-state', 'job-analysis-effective', 'job-analysis-recorded']) {
+    assert.equal(node(id).textContent, 'unknown', `${id}: old values must be erased, not only hidden`);
+  }
+  for (const id of ['job-analysis-task-count', 'job-analysis-ksao-count']) assert.equal(node(id).textContent, '0');
+  assert.equal(pending.length, 2, 'invalidation must not dispatch another request');
+});
+
 const protectedReadCases = [
   {
     kind: 'People', form: 'people-api-form', result: 'people-api-result', status: 'people-api-status',
@@ -281,6 +305,67 @@ const protectedReadCases = [
 ];
 
 for (const fixture of protectedReadCases) {
+  test(`${fixture.kind} authority invalidation fences old response outcomes and preserves fresh reads`, async () => {
+    for (const outcome of ['success', 'body', 'denial', 'body-error']) {
+      const { node, pending, context } = protectedReadWorkspace();
+      let authority = 'previous';
+      const observedAuthorities = [];
+      const config = fixture.kind === 'People' ? context.__ORGMETRA_PEOPLE__ : context.__ORGMETRA_JOB_ANALYSIS__;
+      config.getAuthorization = () => {
+        observedAuthorities.push(authority);
+        return 'Bearer fixture-only';
+      };
+      const submit = () => node(fixture.form).handlers.submit({ preventDefault() {} });
+      const previous = submit();
+      await Promise.resolve();
+      assert.equal(pending.length, 1);
+      let releaseBody;
+      if (outcome === 'body') {
+        let markBody;
+        const entered = new Promise((resolve) => { markBody = resolve; });
+        const body = new Promise((resolve) => { releaseBody = resolve; });
+        pending[0]({ status: 200, ok: true, json: () => { markBody(); return body; } });
+        await entered;
+      }
+      const invalidate = node('document').handlers['orgmetra:authority-invalidated'];
+      assert.equal(typeof invalidate, 'function', 'the documented host event must be wired');
+      invalidate();
+      invalidate();
+      assert.equal(node(fixture.result).hidden, true);
+      assert.equal(node(fixture.clearedField).textContent, 'unknown');
+      assert.equal(node(fixture.status).dataset.state, 'idle');
+      assert.equal(pending.length, 1, 'repeated invalidation cannot perform a read');
+      authority = 'current';
+      const fresh = submit();
+      await Promise.resolve();
+      const freshPayload = fixture.kind === 'People'
+        ? { fields: { display_name: 'Current authority worker', employment_status_code: 'active' } }
+        : { ...fixture.payload, analysis_record_id: 'current-authority-analysis' };
+      pending[1]({ status: 200, ok: true, json: async () => freshPayload });
+      await fresh;
+      assert.deepEqual(observedAuthorities, ['previous', 'current']);
+      assert.equal(node(fixture.result).hidden, false, 'a new explicit authorized read must remain usable');
+      const currentValue = node(fixture.clearedField).textContent;
+      assert.equal(currentValue, fixture.kind === 'People' ? 'Current authority worker' : 'current-authority-analysis');
+      if (outcome === 'body') releaseBody(fixture.payload);
+      else if (outcome === 'denial') pending[0]({ status: 403, ok: false });
+      else pending[0]({ status: 200, ok: true, json: async () => {
+        if (outcome === 'body-error') throw new Error('fixture body failure');
+        return fixture.payload;
+      } });
+      await previous;
+      assert.equal(node(fixture.result).hidden, false, `${outcome}: an old callback cannot hide the current read`);
+      assert.equal(node(fixture.clearedField).textContent, currentValue);
+      assert.equal(node(fixture.status).dataset.state, 'loaded');
+      const denied = submit();
+      await Promise.resolve();
+      pending[2]({ status: 403, ok: false });
+      await denied;
+      assert.equal(node(fixture.result).hidden, true, 'current authority denial remains authoritative');
+      assert.equal(node(fixture.status).dataset.state, 'error');
+    }
+  });
+
   test(`${fixture.kind} coordinate edits invalidate pending responses even after reverting`, async () => {
     for (const coordinate of fixture.coordinates) {
       for (const eventType of ['input', 'change']) {

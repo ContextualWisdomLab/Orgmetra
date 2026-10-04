@@ -65,6 +65,20 @@ an API base URL and short-lived authorization provider through
 The fixture has no such provider and therefore makes no connected-data claim
 or local-data fallback.
 
+For a retained document, the host must synchronously dispatch the payload-free
+`orgmetra:authority-invalidated` event on `document` before another account,
+tenant, or effective authority can see or use the workspace. The listener clears
+both protected read displays and invalidates their pending responses; it grants
+no access and performs no read. The host must keep submissions unavailable until
+its credential provider, destination, and request coordinates are coherent.
+Use the original configuration objects/providers; replacing bootstrap globals is
+not reconfiguration. Destroy and recreate the document if those objects must be
+replaced or reliable notification is unavailable. Sign-out, revocation, repeated
+notifications, and away-and-back transitions must not revive prior results.
+This display contract does not cancel transport or prevent a helper awaiting
+credentials from later dispatching. Actual host notification and released
+identity integration remain unverified.
+
 ## Local Storybook runtime
 
 The repository uses Storybook `10.5.10` with

@@ -147,7 +147,12 @@ The current HR workspace browser contract runs Chromium against the static
 workspace with Playwright. It covers the Employee Profile permission boundary,
 English/Korean accessible labels, required-reason focus behavior, host-injected
 People and Job Analysis reads, authorization/purpose request data, and denied
-read errors without fixture fallback. Run it with:
+read errors without fixture fallback. The host-authority document event is
+covered by synchronous clearing of both surfaces, all rendered-field scrubbing,
+repeated notifications, held success/JSON/denial/body-error response fences, and
+fresh explicit authorized/denied reads. These synthetic host and transport
+controls do not establish actual host notification timing, live account changes,
+request cancellation, or released identity integration. Run it with:
 
 ```text
 npm run test:e2e

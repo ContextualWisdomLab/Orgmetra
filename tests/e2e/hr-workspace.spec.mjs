@@ -359,6 +359,46 @@ for (const fixture of [
   });
 }
 
+test('host authority invalidation clears both protected surfaces and permits explicit fresh reads', async ({ page }) => {
+  await injectProtectedReadConfig(page);
+  let requests = 0;
+  await page.route('**/v1/tenants/**/people/**', async (route) => {
+    requests += 1;
+    await route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ fields: { display_name: 'Authorized fixture worker', employment_status_code: 'active' } }) });
+  });
+  await page.route('**/v1/tenants/**/job-analysis-snapshots/**', async (route) => {
+    requests += 1;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(jobAnalysisSnapshot) });
+  });
+  await page.goto(workspacePath);
+  await page.locator('[data-view-link="employee-profile"]').first().click();
+  await page.getByRole('button', { name: 'Load worker record', exact: true }).click();
+  await expect(page.locator('#people-api-display-name')).toHaveText('Authorized fixture worker');
+  await page.locator('[data-view-link="job-analysis"]').first().click();
+  await page.getByRole('button', { name: 'Load snapshot', exact: true }).click();
+  await expect(page.locator('#job-analysis-analysis-id')).toHaveText(jobAnalysisSnapshot.analysis_record_id);
+  const cleared = await page.evaluate(() => {
+    document.dispatchEvent(new Event('orgmetra:authority-invalidated'));
+    return ['people-api', 'job-analysis'].map((prefix) => ({
+      hidden: document.getElementById(`${prefix}-result`).hidden,
+      state: document.getElementById(`${prefix}-status`).dataset.state,
+    }));
+  });
+  expect(cleared).toEqual([{ hidden: true, state: 'idle' }, { hidden: true, state: 'idle' }]);
+  for (const id of ['people-api-display-name', 'people-api-employment-status', 'job-analysis-analysis-id', 'job-analysis-state', 'job-analysis-effective', 'job-analysis-recorded']) {
+    await expect(page.locator(`#${id}`)).toHaveText('unknown');
+  }
+  for (const id of ['job-analysis-task-count', 'job-analysis-ksao-count']) await expect(page.locator(`#${id}`)).toHaveText('0');
+  expect(requests).toBe(2);
+  await page.getByRole('button', { name: 'Load snapshot', exact: true }).click();
+  await expect(page.locator('#job-analysis-result')).toBeVisible();
+  await page.locator('[data-view-link="employee-profile"]').first().click();
+  await page.getByRole('button', { name: 'Load worker record', exact: true }).click();
+  await expect(page.locator('#people-api-result')).toBeVisible();
+  expect(requests).toBe(4);
+});
+
 test('personal-details purpose edits clear prior review states without granting access', async ({ page }) => {
   await page.goto(workspacePath);
   await page.locator('[data-view-link="employee-profile"]').first().click();

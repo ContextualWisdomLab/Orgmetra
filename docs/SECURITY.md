@@ -48,6 +48,15 @@ cancels the request already sent nor replaces authoritative API authorization.
 A fresh explicit read still uses the existing host-provided credential and
 cookie-free transport. Synthetic Node and Chromium regressions are local
 boundary evidence, not released authentication or deployment acceptance.
+For retained documents, a payload-free `orgmetra:authority-invalidated` document
+event synchronously clears both read displays and advances both response fences.
+The embedding host must emit it before exposing the document to a changed
+account, tenant, or effective authority, including sign-out and revocation.
+It grants no access and does not infer identity from credentials or form inputs.
+Host notification timing, coherent provider/coordinates, and release integration
+remain separate requirements; otherwise the host must destroy the document.
+Transport cancellation and preventing post-transition dispatch from a helper
+awaiting credentials are not established by this display fence.
 The fixture's personal-details purpose selector also clears both prior allowed
 and denied display states on input or change. Changing or restoring a purpose
 never grants access or performs a new review. This fixture display rule does not

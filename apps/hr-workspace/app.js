@@ -468,5 +468,9 @@ if (typeof document !== 'undefined') {
       setPeopleApiStatus(error.message === 'PEOPLE_ACCESS_DENIED' ? 'peopleApiDenied' : 'peopleApiFailed', 'error');
     }
   });
+  document.addEventListener('orgmetra:authority-invalidated', () => {
+    invalidateJobAnalysisRead();
+    invalidatePeopleRead();
+  });
   setLocale(locale);
 }
