@@ -35,15 +35,15 @@
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "bddc0023259306f2b9de2a67160aa5523d140270691ba42816c34c362e342d7d",
-      "bytes": 7809,
+      "sha256": "d974b7e6f0ec17e321887e208e6f893a557546206b367fec63e112410618c0df",
+      "bytes": 7908,
       "lines": 107
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3f3fd746b4fc477a3decb106fe03c4f146a6069a6794d60b7bf17a98ef27e70f",
-      "bytes": 20940,
-      "lines": 91
+      "sha256": "401d25b739a3359122da3780f29152f94348803a4232cdeb72173588f49ae5ab",
+      "bytes": 21311,
+      "lines": 92
     },
     {
       "path": "CLAUDE.md",
@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "b62bfcab39f1357d29b845c73d2705cf8bd8030abb0b083c9fc48eddf738aa10",
-      "bytes": 15320,
-      "lines": 396
+      "sha256": "dd652709f47dc0fbb3a38dfda4be966f056a8f5f51967857811a690d58dcb40f",
+      "bytes": 16264,
+      "lines": 409
     },
     {
       "path": "tests/hr-workspace.test.mjs",

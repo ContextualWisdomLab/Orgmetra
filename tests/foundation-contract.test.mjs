@@ -99,6 +99,19 @@ test('canonical foundation passes validation', () => {
   assert.deepEqual(validateFoundation(resolve('.')), []);
 });
 
+test('Job Architecture ownership documents its existing snapshot tables', () => {
+  const architecture = readFileSync(new URL('../ARCHITECTURE.md', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../database/migrations/0013_job_analysis_snapshot.sql', import.meta.url), 'utf8');
+  const rows = architecture.split('\n').filter((line) => line.startsWith('| `job_architecture` |'));
+  assert.equal(rows.length, 1, 'the owning context must have one representative table row');
+  assert.match(rows[0], /job profiles and publication evidence/);
+  assert.match(rows[0], /`job_architecture_role`/);
+  for (const table of ['job_analysis_snapshot', 'job_analysis_task_item', 'job_analysis_ksao_item']) {
+    assert.match(migration, new RegExp(`CREATE TABLE ${table} \\(`), `${table} must exist in the owned migration`);
+    assert.ok(rows[0].includes(`\`${table}\``), `${table} must appear in its owning architecture row`);
+  }
+});
+
 test('governance docs name the protected default branch rather than stale main', () => {
   const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
   assert.doesNotMatch(agents, /protected[- ](?:`)?main(?:`)?/i);
