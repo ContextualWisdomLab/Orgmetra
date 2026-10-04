@@ -6,6 +6,10 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Added
 
+- Active-PR, source-only CI routing proposal: bind Foundation and Recovery to the dedicated `CWL CI isolated` group and exact labels, reject hosted or privileged fallback selectors, and declare only the custom label needed by actionlint. Runtime capacity, repository access, isolation, cleanup, canary, and managed Code Quality routing remain separate acceptance conditions. Existing quality and security gates remain required.
+
+- Active-PR browser harness ownership repair: refuse existing HTTP servers in every environment and validate optional `ORGMETRA_WORKSPACE_PORT` overrides as canonical decimal TCP ports 1–65535 before fixture launch. Unset overrides retain 4173; browser assertions, 15-second case deadlines, and failure recording remain unchanged. Actual config-import regressions join the existing Foundation integration test; local evidence does not authorize merge or deployment.
+
 - Dependency-free HR Home and Employee Profile fixture at `apps/hr-workspace/`, using the Figma role frames and shared tokens with explicit API-boundary, permission-denied, evidence-drawer, high-impact confirmation, exact-allocation, focus, and English/Korean states. The fixture is not connected or deployed evidence.
 - Local Storybook `10.5.10` runtime using `@storybook/web-components-vite` and native HTML/CSS stories for the HR action states, field errors, permission denial, evidence drawer, high-impact confirmation, and exact assignment values. It is local component/state evidence, not connected People API or browser E2E evidence.
 - Chromium Playwright browser E2E for the HR workspace, covering keyboard-accessible human review, locale changes, purpose-bound denial, host-injected People and Job Analysis reads, authorization headers, and no-fallback error behavior. The test is local/CI evidence and does not claim protected deployment.
@@ -42,6 +46,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Active-PR CI dependency-order repair: Foundation installs the reviewed Node lockfile before validation; Recovery provisions the same pinned Node 24 and Python 3.14 runtimes and runs `npm ci` before validation. Existing config-import regressions retain their real Playwright dependency, and integration tests guard the prerequisite order. Dependencies, lockfile, browser behavior, runner selectors, and all quality gates are unchanged; local evidence is not hosted execution or approval.
 - Consolidated repository-owned PR validation from twelve workflows into one Foundation CI job, while keeping the dual-cluster recovery rehearsal separately path-scoped. Central required review and security workflows remain organization-owned.
 - Aligned the English/Korean locale toggle's accessible name with its visible target-language label (`한국어` / `English`) and added exact browser assertions for both language states, following WCAG 2.2 Success Criterion 2.5.3 (Label in Name); the APA 7 W3C citation remains in `docs/doctoring/REFERENCES.md`.
 - Reconciled README, traceability, ADR status/index, and changelog maturity claims with capabilities already integrated on protected `develop`; open-PR capabilities remain explicitly non-shipped.

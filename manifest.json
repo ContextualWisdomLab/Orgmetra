@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "3957487242e7fe0f80876f001488b5f2baf4e20b9092ea804a7b39deef9e9cc0",
-      "bytes": 6962,
-      "lines": 133
+      "sha256": "6c665092776ed9e7baef4b5885ecf20249a298e6ee9b70426e9474af7eddc3a6",
+      "bytes": 7038,
+      "lines": 135
     },
     {
       "path": ".gitignore",
@@ -41,9 +41,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a5f765eb9b1ac6ad0a312b8a4ee244363d96b9c231db52ad4706b9a22ea42cbf",
-      "bytes": 18803,
-      "lines": 84
+      "sha256": "a6377129359cfd0bd0f6a0ed9f66eecc7b758136c7846484c326c6db23939b26",
+      "bytes": 20190,
+      "lines": 89
     },
     {
       "path": "CLAUDE.md",
@@ -191,9 +191,9 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "82b2d3e70cec371ef35e9e0f982ac40fef84351976bc04b863b81d27023d5a62",
-      "bytes": 11189,
-      "lines": 71
+      "sha256": "0f81072b3e76abf1a58a8f4049bd73aeea00fc27ecc419c378a7c53950484c37",
+      "bytes": 13554,
+      "lines": 83
     },
     {
       "path": "docs/PRD.md",
@@ -221,9 +221,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "3fd9e7c058d473f9a6ba236ef77265e388b0e3ab07358fd68414136cdb9b78ec",
-      "bytes": 17473,
-      "lines": 151
+      "sha256": "ef0986022e0b2b3353a8323283fcd24429063579a62e14fdae95c2ca81420c6d",
+      "bytes": 18894,
+      "lines": 158
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -407,9 +407,9 @@
     },
     {
       "path": "playwright.config.mjs",
-      "sha256": "dd0dc60b82e7cc620b74e3e7649ccf94e6046fc0150c28ee6be7f3d4f5ddd3e3",
-      "bytes": 920,
-      "lines": 34
+      "sha256": "8de52e4f5a8f59f8b8814e90678c89c108fffa7ce1275e37b15b4adb02fc0d30",
+      "bytes": 1205,
+      "lines": 38
     },
     {
       "path": "schemas/openapi.yaml",
@@ -509,9 +509,9 @@
     },
     {
       "path": "tests/test_github_actions_runner_image.py",
-      "sha256": "92c7e84c4b598097e941a949fd4498309b7c8e1167800559a73eee0338991cc1",
-      "bytes": 8207,
-      "lines": 204
+      "sha256": "a0ea3c514da21bfd35c98c53fa958c5decef4fa624873f6b93757bd736c03947",
+      "bytes": 10036,
+      "lines": 232
     },
     {
       "path": "tests/test_job_analysis_snapshot_postgres.sh",
@@ -563,9 +563,9 @@
     },
     {
       "path": "tests/workspace-foundation-integration.test.mjs",
-      "sha256": "d0e8601345c4c59fe8df361d2eb9f420dc4a71fe1301f6e23692204d35bc57f2",
-      "bytes": 891,
-      "lines": 16
+      "sha256": "57cd7a081c8e6f5c74cc68674175f8bb8dbe430fcdd98ad33504904b17e3ab8c",
+      "bytes": 6904,
+      "lines": 130
     }
   ]
 }

@@ -1,8 +1,10 @@
-"""Regression contract for deterministic GitHub-hosted runner image selection.
+"""Regression contract for proposed isolated self-hosted CI routing.
 
-Orgmetra uses an explicit supported Ubuntu image instead of moving aliases,
-other image versions, or expression-driven selectors. Queued evidence remains
-non-passing; this test only protects the repository-owned runner contract.
+The canonical group and labels come from central .github PR #2565, not a
+released or registered pool. This is source-only evidence: capacity, QSR,
+linux-cluster-ops #326 isolation/cleanup attestation and canary remain pending.
+Managed GitHub Code Quality routing is separately owned; no local CodeQL copy
+is introduced. Queued evidence remains non-passing.
 """
 
 from __future__ import annotations
@@ -15,7 +17,10 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 _RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*$")
-_EXPECTED_RUNNER = "ubuntu-24.04"
+_EXPECTED_RUNNER = (
+    "group: CWL CI isolated\n"
+    "labels: [self-hosted, linux, x64, cwlab-ci-isolated]"
+)
 _CENTRAL_WORKFLOW_NAMES = {
     "close-empty-pr.yml",
     "codeql-pr.yml",
@@ -65,21 +70,41 @@ def _strip_yaml_comment(value: str) -> str:
 
 
 def _runner_declarations(workflow: str) -> list[tuple[int, str]]:
-    """Return line-numbered scalar ``runs-on`` declarations without YAML comments."""
+    """Read scalars or canonical two-space block selectors, never evaluating YAML.
+
+    This deliberately narrow source grammar fails closed on alternate mapping
+    forms, duplicate keys, extra fields and noncanonical child indentation.
+    Workflow syntax is independently checked by actionlint.
+    """
     declarations: list[tuple[int, str]] = []
-    for line_number, line in enumerate(workflow.splitlines(), start=1):
+    lines = workflow.splitlines()
+    for index, line in enumerate(lines):
         match = _RUNS_ON_PATTERN.match(line)
         if match is None:
             continue
         value = _strip_yaml_comment(match.group(1))
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        if not value:
+            indent = len(line) - len(line.lstrip(" "))
+            children: list[str] = []
+            for child in lines[index + 1 :]:
+                content = _strip_yaml_comment(child)
+                if not content:
+                    continue
+                child_indent = len(child) - len(child.lstrip(" "))
+                if child_indent <= indent:
+                    break
+                if child_indent != indent + 2:
+                    content = "noncanonical indentation: " + content
+                children.append(content)
+            value = "\n".join(children)
+        elif len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
             value = value[1:-1]
-        declarations.append((line_number, value))
+        declarations.append((index + 1, value))
     return declarations
 
 
 class GitHubActionsRunnerImageContractTest(unittest.TestCase):
-    """Keep every repository-owned runner declaration on one explicit image."""
+    """Keep every repository-owned runner on the proposed isolated group selector."""
 
     def test_all_repository_workflow_runner_selectors_are_exact(self) -> None:
         """Reject aliases, expressions, other versions, and missing runner declarations."""
@@ -105,31 +130,34 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
         )
 
     def test_runner_parser_rejects_dynamic_and_noncanonical_values(self) -> None:
-        """Keep the validator sensitive to aliases, expressions, lists, and other images."""
-        sample = "\n".join(
-            (
-                "runs-on: ubuntu-latest",
-                "runs-on: ${{ matrix.runner }}",
-                "runs-on: ubuntu-22.04",
-                "runs-on: [self-hosted, linux]",
-                "runs-on: 'ubuntu-24.04'",
-            )
+        """Admit only a literal dedicated group plus the complete canonical labels."""
+        canonical = "runs-on:\n  " + _EXPECTED_RUNNER.replace("\n", "\n  ")
+        self.assertEqual([(1, _EXPECTED_RUNNER)], _runner_declarations(canonical))
+        rejected = (
+            "runs-on: ubuntu-24.04",
+            "runs-on: ubuntu-latest",
+            "runs-on: ${{ matrix.runner }}",
+            "runs-on: [self-hosted, linux, x64, cwlab-ci-isolated]",
+            "runs-on:\n  labels: [self-hosted, linux, x64, cwlab-ci-isolated]",
+            canonical.replace("CWL CI isolated", "CWL central control"),
+            canonical.replace("CWL CI isolated", "${{ vars.RUNNER_GROUP }}"),
+            canonical.replace("  labels: [self-hosted, linux, x64, cwlab-ci-isolated]", ""),
+            canonical.replace("[self-hosted, linux, x64, cwlab-ci-isolated]", "${{ matrix.labels }}"),
+            canonical.replace(", cwlab-ci-isolated", ""),
+            canonical.replace("cwlab-ci-isolated", "cwlab-control"),
+            canonical.replace("cwlab-ci-isolated]", "cwlab-ci-isolated, ubuntu-24.04]"),
+            canonical.replace("linux, x64", "x64, linux"),
+            canonical + "\n  group: CWL central control",
+            canonical.replace("  labels:", "    labels:"),
+            "runs-on:",
+            "name: no runner declaration",
         )
-        declarations = _runner_declarations(sample)
-        self.assertEqual(
-            [
-                "ubuntu-latest",
-                "${{ matrix.runner }}",
-                "ubuntu-22.04",
-                "[self-hosted, linux]",
-                "ubuntu-24.04",
-            ],
-            [value for _, value in declarations],
-        )
-        self.assertEqual(
-            1,
-            sum(value == _EXPECTED_RUNNER for _, value in declarations),
-        )
+        for sample in rejected:
+            with self.subTest(sample=sample):
+                self.assertFalse(
+                    any(value == _EXPECTED_RUNNER for _, value in _runner_declarations(sample)),
+                    f"noncanonical selector was admitted: {sample}",
+                )
 
     def test_runner_parser_only_strips_yaml_comment_tokens(self) -> None:
         """Do not mistake a hash inside a plain or quoted scalar for a YAML comment."""

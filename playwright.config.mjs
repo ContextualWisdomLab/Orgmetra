@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const port = 4173;
+// Reject malformed overrides before interpolating a shell command or starting a fixture.
+const port = process.env.ORGMETRA_WORKSPACE_PORT ?? '4173';
+if (!/^[1-9][0-9]{0,4}$/.test(port) || Number(port) > 65535) {
+  throw new Error('ORGMETRA_WORKSPACE_PORT must be a canonical decimal TCP port from 1 to 65535');
+}
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -28,7 +32,7 @@ export default defineConfig({
   webServer: {
     command: `python3 -m http.server ${port} --bind 127.0.0.1`,
     url: `http://127.0.0.1:${port}/apps/hr-workspace/index.html`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });
