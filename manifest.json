@@ -42,9 +42,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "bfd2226d9e901aa68360ecbb77a580f522f28e9ba5051f494e66e75e435cdaea",
-      "bytes": 25959,
-      "lines": 103
+      "sha256": "e51a45dd41d6d6cfdf989c01d9ac200eed60e16b77cc3c7d3885757dc71b1058",
+      "bytes": 26353,
+      "lines": 104
     },
     {
       "path": "CLAUDE.md",
@@ -360,8 +360,8 @@
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "ad91cae6bb2d8b1fc3f89ffc1657e234173fffa4f7205c6824d9b21da0e77031",
-      "bytes": 7344,
+      "sha256": "63e9cbf225000be43826b5240da338946a58ff650779b5d6a0123628a1683982",
+      "bytes": 7652,
       "lines": 85
     },
     {
@@ -450,9 +450,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "e1e764a72f77fa46a0ad800419a6c1718b600e65733a6ae2570a315c4403855d",
-      "bytes": 22393,
-      "lines": 510
+      "sha256": "fe1b99270262d5ebe8db4c92ddabead92030f7f0d8933e5398b04dd9254d0c09",
+      "bytes": 25445,
+      "lines": 560
     },
     {
       "path": "tests/hr-workspace.test.mjs",

@@ -129,6 +129,56 @@ test('workspace documentation separates observed source from historical executio
   assert.match(gap, /parameter_rmse_mean` 2\.9606/);
 });
 
+/** Check the two version-pinned bibliography records against observed arXiv metadata. */
+function requireOrchestrationReferenceAuthors(references) {
+  const expected = [
+    {
+      id: '2606.21228v2',
+      prefix: 'Tang, Y., Cetin, E., Xu, J., Sun, Q., Nielsen, S., Richard, V., Goda, H., Tymchenko, I., Nguyen, N., Lee, H., Ashiga, M., Kotyan, S., Kuroki, S., & Clanuwat, T. (2026).',
+      title: '*Sakana Fugu technical report*',
+      version: 'Version 2, revised June 23, 2026'
+    },
+    {
+      id: '2512.04695v3',
+      prefix: 'Xu, J., Sun, Q., Schwendeman, P., Nielsen, S., Cetin, E., & Tang, Y. (2026).',
+      title: '*TRINITY: An evolved LLM coordinator*',
+      version: 'Version 3, revised April 27, 2026; first submitted December 4, 2025'
+    }
+  ];
+  for (const record of expected) {
+    const entries = references.split(/\r?\n\s*\r?\n/).filter((entry) => entry.includes(record.id.split('v')[0]));
+    assert.equal(entries.length, 1, `${record.id}: one bibliography entry is required`);
+    assert.ok(entries[0].startsWith(record.prefix), `${record.id}: registered authors must replace organization attribution`);
+    assert.ok(entries[0].includes(record.title), `${record.id}: title must remain associated with its record`);
+    assert.ok(entries[0].includes(`(arXiv:${record.id})`), `${record.id}: observed version must be pinned`);
+    assert.ok(entries[0].includes(record.version), `${record.id}: revision year must be explicit`);
+    assert.ok(entries[0].includes(`https://arxiv.org/abs/${record.id}`), `${record.id}: versioned record must remain locatable`);
+  }
+}
+
+test('orchestration bibliography preserves registered authors and observed revision versions', () => {
+  const references = readFileSync(new URL('../docs/doctoring/REFERENCES.md', import.meta.url), 'utf8');
+  requireOrchestrationReferenceAuthors(references);
+  for (const [id, prefix, oldAttribution] of [
+    ['2606.21228v2', 'Tang, Y., Cetin, E.', 'Fugu Team, Sakana AI'],
+    ['2512.04695v3', 'Xu, J., Sun, Q.', 'Sakana AI']
+  ]) {
+    assert.ok(references.includes(prefix));
+    const originalEntries = references.split(/\r?\n\s*\r?\n/);
+    const contradicted = originalEntries.map((entry) => entry.includes(`(arXiv:${id})`) ? entry.replace(prefix, oldAttribution) : entry).join('\n\n');
+    const changedEntries = contradicted.split(/\r?\n\s*\r?\n/);
+    assert.equal(changedEntries.length, originalEntries.length);
+    const targetIndexes = originalEntries.flatMap((entry, index) => entry.includes(`(arXiv:${id})`) ? [index] : []);
+    assert.equal(targetIndexes.length, 1, `${id}: mutation target must be unique`);
+    const changedIndexes = originalEntries.flatMap((entry, index) => entry !== changedEntries[index] ? [index] : []);
+    assert.deepEqual(changedIndexes, targetIndexes, `${id}: only the identified bibliography record may change`);
+    assert.throws(() => requireOrchestrationReferenceAuthors(contradicted), {
+      code: 'ERR_ASSERTION',
+      message: `${id}: registered authors must replace organization attribution`
+    });
+  }
+});
+
 test('offer approval ADR keeps its exact decision status separate from branch provenance', () => {
   const adr = readFileSync(new URL('../docs/adr/0017-governed-offer-approval.md', import.meta.url), 'utf8');
   const index = readFileSync(new URL('../docs/adr/README.md', import.meta.url), 'utf8');

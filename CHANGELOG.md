@@ -50,6 +50,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Active-PR bibliography repair: Fugu and TRINITY references now list the registered individual authors and pin the observed arXiv versions. Explicit revision dates distinguish TRINITY's 2026 revision from its 2025 first submission. A canonical regression rejects organization-author substitution for these two records; no numerical, runtime, identity, protection, or release behavior changes.
 - Active-PR restore provenance repair: recovery scope now attributes backup requirements and migration source to the immutable observed develop base, not current protected integration or enabled recovery controls. A shared scope regression rejects stale protected-main claims while retaining the actual recovery source, destructive-operation guards, and source manifest integrity. Hosted execution, deployed recovery and release remain unverified.
 - Active-PR maturity evidence repair: the validator rejects obsolete `implemented_on_protected_main` through otherwise-valid matrix regressions. Local source-backed capabilities use `implemented_on_active_pr` as the current assessment bound, not a claim that their implementation is new or absent from the observed develop base. Baseline source presence and historical classifications remain explicit, while current protection, hosted execution and release evidence are unverified. The external Keyverse identity row records accepted architecture rather than claiming issuer integration. No runtime, SQL, authentication or protection policy is changed.
 
