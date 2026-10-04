@@ -1,9 +1,17 @@
 # Orgmetra product and technical gap baseline
 
-**Snapshot:** 2026-08-21, Asia/Seoul
-**Evidence base:** protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df`; current workspace PR #53 at `c45a8a53125a6075f5edb4a33e02661df4c5d1b5` immediately before this documentation snapshot commit; current GitHub PR metadata and exact-head workflow state observed on 2026-08-21.
+**Historical snapshot:** 2026-08-21, Asia/Seoul
+**Historical evidence base:** protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df`; current workspace PR #53 at `c45a8a53125a6075f5edb4a33e02661df4c5d1b5` immediately before this documentation snapshot commit; current GitHub PR metadata and exact-head workflow state observed on 2026-08-21.
 
 This document is the buyer-facing work queue. It separates what a customer can use from what exists only in an active PR or architecture document. It is updated when a protected merge, exact-head check, review, release, or runtime test changes the evidence boundary.
+
+## Current observed base source attribution (2026-10-05)
+
+The retained local default-branch observation identifies `develop` at `eb9757f8649aaad026a9865508d9aad50c1a7a4f`. Exact immutable Git source inspection finds `packages/hris-kernel/src/orgmetra_hris_kernel/workforce.py` (`build_workforce_composition_snapshot`, with effective date and knowledge cutoff) and `packages/hris-kernel/tests/test_workforce_composition.py` plus `test_workforce_composition_boundaries.py`; the base README also names bitemporal workforce-composition evidence as already on `develop`. This establishes base repository source presence, not evidence of configured branch-protection enforcement, a newly executed test, deployed behavior, or a release. The historical PR #54 row below describes proposed same-cutoff composition-change evidence; it must not be read as saying all workforce-composition source is absent from this observed base.
+
+All remaining sections below retain the 2026-08-21 snapshot: capability/maturity and buyer-gap tables, architecture/control-plane statements, open-PR inventory, and local execution results (including “current”, “current head”, and “protected” wording) are historical claims at their recorded coordinates, not fresh enforcement, execution, deployment, or release findings. No new all-PR inventory is asserted. Active PR #53 UI remains unmerged; this attribution correction does not advance its maturity or transfer prior checks/reviews to its frozen successor.
+
+The retained lineage observation records overlapping Draft #100 and #51 documentation work. #100 retains the Gap ledger role and those branches remain unchanged. This correction is confined to the existing PR #53 checkout; it does not adopt either Draft source, reassign their owners, or establish approval, merge, or release.
 
 ## Maturity vocabulary
 
@@ -36,7 +44,7 @@ flowchart LR
     validity -. integrity only, no estimator .-> gap3[Gap P0-3]
 ```
 
-## Capability truth on protected `develop`
+## Historical capability truth on `develop` (2026-08-21)
 
 | Capability | Current evidence | Maturity | Buyer consequence |
 |---|---|---|---|
@@ -63,7 +71,7 @@ flowchart LR
 | CSAP/SOC 2 evidence package | Security, threat, operability, and test documents exist; no control-evidence collection or attestation exists | `accepted_architecture` | The design is compliance-ready in intent, not a certification or audit report. |
 | Release artifact | Root package is `0.1.0`; changelog remains `[Unreleased]`; no protected product release was verified | `planned` | Customers have no versioned, supportable Orgmetra product release yet. |
 
-## Local candidate artifact outside protected truth
+## Historical local candidate artifact (2026-08-21)
 
 The current checkout contains `apps/hr-workspace/`, a dependency-free HR Home
 and Employee Profile fixture based on Figma nodes `1:10` and `1:28`, plus
@@ -75,7 +83,7 @@ fixture explicitly displays that the protected People API is not connected.
 The Job Analysis view requires a host-injected API base URL and authorization
 provider, sends the existing purpose header, and has no synthetic fallback or
 browser credential storage. The same active PR includes a local Storybook runtime with tokenized stories and a three-test Chromium Playwright contract;
-the current head passed the Storybook build and browser contract, but those
+the historical snapshot head passed the Storybook build and browser contract, but those
 tests intercept host-injected reads and do not prove a connected People API,
 hosted deployment, or protected-develop truth. The artifact must be reviewed,
 checked, and merged independently before P0-1 can change maturity.
@@ -93,9 +101,9 @@ checked, and merged independently before P0-1 can change maturity.
 | P1-3 | Data Platform | Define and rehearse hot-partition strategy for append-heavy audit/outbox and temporal facts, including tenant/time key choice, partition creation, retention, reindexing, and cross-partition query tests. | P0-1; production volume evidence |
 | P1-4 | Trust / Operability | Build a CSAP/SOC 2 control matrix with owner, control activity, evidence location, retention, incident path, and release approval. Label it readiness evidence, never certification. | P0-1/P0-2 |
 
-## Current open PR inventory and integration order
+## Historical open PR inventory and integration order (2026-08-21)
 
-The following is the current GitHub inventory checked on 2026-08-21. All listed PRs target `develop@9e3e4847510e1e612b48474ba42b177b8ed824df`. `REVIEW_REQUIRED` means the GitHub listing reported that review gate; it is not approval evidence. No self-approval or protection bypass is permitted.
+The following is the historical GitHub inventory checked on 2026-08-21; it is not a current all-PR inventory. All listed PRs target `develop@9e3e4847510e1e612b48474ba42b177b8ed824df`. `REVIEW_REQUIRED` means the GitHub listing reported that review gate; it is not approval evidence. No self-approval or protection bypass is permitted.
 
 | PR | Head branch / exact head | Scope | Current state | Next action |
 |---:|---|---|---|---|
@@ -114,7 +122,7 @@ The following is the current GitHub inventory checked on 2026-08-21. All listed 
 | 42 | `feat/selection-outcome-monitoring-plan` / `ea8f62ab44b535b2d71bf6fa874b757bb777b72d` | Selection outcome monitoring | Ready; merge state `BLOCKED`; `REVIEW_REQUIRED`; no current review thread; current workflows queued | Verify monitoring scope and temporal cohort semantics before protected merge. |
 | 40 | `feat/structured-interview-plan` / `11838bcc88fd8afcc37ab0cbe3c6d8c5d8f19344` | Governed structured interview plan | Ready; merge state `BLOCKED`; `REVIEW_REQUIRED`; historical review threads resolved/outdated; current workflows queued | Verify human review, evidence versioning, and current-head checks before protected merge. |
 
-No open GitHub Issue was returned by the current `gh issue list` query. This does not mean product work is exhausted: the backlog above is derived from protected runtime gaps and is intentionally independent of issue presence.
+No open GitHub Issue was returned by the historical 2026-08-21 `gh issue list` query. This does not mean product work is exhausted: the backlog above is derived from protected runtime gaps and is intentionally independent of issue presence.
 
 ## Operating scheduler boundary
 
@@ -146,17 +154,17 @@ The loop is an operating procedure, not evidence of completion. Its next custome
 
 The complete APA 7 bibliography is in `docs/doctoring/REFERENCES.md`.
 
-## Fresh local evidence
+## Historical local evidence (2026-08-21)
 
 | Check | Result |
 |---|---|
 | Protected `develop` contents | `git ls-tree` at `9e3e4847510e1e612b48474ba42b177b8ed824df` contains migration `0013`, Job Analysis API, ADR `0014`, candidate-evidence package, ADR `0025`, the protected offer-approval package, and their quality workflows. This proves repository presence, not deployment. |
 | `npm run validate` on active PR #53 | Passed: foundation validation and 62 Node tests on exact local head `c45a8a53125a6075f5edb4a33e02661df4c5d1b5`. |
-| Earlier Python package matrix | Exact local head `c2d3a6c2804ab5a3e17e454312eddc2f96f2a72f`: HRIS kernel 171 passed; candidate-evidence 75 passed; offer-approval 84 passed. All owned statement and branch coverage reports were 100%. Current exact-head service results are listed below. |
+| Earlier Python package matrix | Exact local head `c2d3a6c2804ab5a3e17e454312eddc2f96f2a72f`: HRIS kernel 171 passed; candidate-evidence 75 passed; offer-approval 84 passed. All owned statement and branch coverage reports were 100%. Historical exact-head service results are listed below. |
 | Storybook and browser fixture | Storybook `10.5.10` production build and `npm run test:e2e` passed on exact local head `c45a8a53125a6075f5edb4a33e02661df4c5d1b5`; Chromium `1.62.1` covered human-review/permission/confirmation/i18n states, host-injected People and Job Analysis reads, authorization/purpose request data, and denied-read no-fallback behavior. Routes are locally intercepted, so connected protected deployment evidence remains open. |
 | External pinned validity smoke | At exact read-only `fast-mlsirm` revision `04d0bc21a2a20693bcf16108cd76d394fe844d23`, a local simulation→Rust fit returned `MLS2PLM`, shape `(500, 16)`, backend `rust`, device `auto`, `max_iter_reached` at 101 iterations, and nontrivial recovery error (`parameter_rmse_mean` 2.9606; `gamma_abs_error` 0.9058). This is exploratory external evidence only: no Orgmetra estimator, acceptance study, GPU parity, or protected runtime is claimed. |
-| Current exact-head service and PostgreSQL validation | On exact local head `c45a8a53125a6075f5edb4a33e02661df4c5d1b5`, `uv run --project services/people-api --extra test pytest services/people-api/tests` passed 146 tests and `uv run --project services/job-analysis-api --extra test pytest services/job-analysis-api/tests` passed 69 tests, each with 100% owned statement and branch coverage. Both services now have project-local source mappings and checked `uv.lock` files; Job Analysis additionally has corrected Python compatibility metadata and test extras. No manual `PYTHONPATH` was required. Disposable PostgreSQL `16.14` runs passed `test_job_analysis_snapshot_postgres.sh` and `test_people_mutation_idempotency_postgres.sh`; these are local contract evidence, not hosted terminal gates or deployment proof. |
+| Historical exact-head service and PostgreSQL validation | On exact local head `c45a8a53125a6075f5edb4a33e02661df4c5d1b5`, `uv run --project services/people-api --extra test pytest services/people-api/tests` passed 146 tests and `uv run --project services/job-analysis-api --extra test pytest services/job-analysis-api/tests` passed 69 tests, each with 100% owned statement and branch coverage. Both services now have project-local source mappings and checked `uv.lock` files; Job Analysis additionally has corrected Python compatibility metadata and test extras. No manual `PYTHONPATH` was required. Disposable PostgreSQL `16.14` runs passed `test_job_analysis_snapshot_postgres.sh` and `test_people_mutation_idempotency_postgres.sh`; these are local contract evidence, not hosted terminal gates or deployment proof. |
 | Protected-tree preservation | `git diff --name-status origin/develop..HEAD --diff-filter=D` returned zero deleted paths; protected Job Analysis migration/API/OpenAPI/quality-contract files remain present on the active PR branch. |
 | PostgreSQL contracts | `tests/test_job_analysis_snapshot_postgres.sh` passed on exact local head `c2d3a6c2804ab5a3e17e454312eddc2f96f2a72f` against disposable PostgreSQL `16.14`; the full hosted PostgreSQL matrix remains the authoritative release gate. |
 
-These results prove the current foundation contracts and a local browser contract. They do not prove that open PRs are merged, that a connected or released browser UI exists, that a statistical estimator exists, or that Orgmetra is certified under CSAP/SOC 2.
+These historical results record foundation contracts and a local browser contract at their listed local coordinates; they are not execution evidence for the current observed base or frozen UI successor. They do not prove that open PRs are merged, that a connected or released browser UI exists, that a statistical estimator exists, or that Orgmetra is certified under CSAP/SOC 2.

@@ -41,9 +41,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6948e4c85d358091459a36f71eba1538f359f62622d3f4f3bea78074f2e3eb8b",
-      "bytes": 21715,
-      "lines": 93
+      "sha256": "9302249574659c96c0af45bef673c6d2b1e8e11fd735eb5fa4cde19ea34f6010",
+      "bytes": 22186,
+      "lines": 94
     },
     {
       "path": "CLAUDE.md",
@@ -65,8 +65,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "ca37344f7c0fba3659c9e94804add2076287bb0612e0a415a5a271fdca9b74a2",
-      "bytes": 4494,
+      "sha256": "1e2ca561bca7fc90b3439cc06b9be71fac1eb7657f895fec12d095587e9b77a2",
+      "bytes": 4756,
       "lines": 89
     },
     {
@@ -221,9 +221,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "f7331cb3e9e42dbcdfd1898e9d1fe498c11866941b6b04177e853cf91b5c5d1e",
-      "bytes": 20038,
-      "lines": 163
+      "sha256": "cdd8d21294d5bfe172b2a7f4d9592449b95f18703254ef9c139a19104b63540b",
+      "bytes": 20163,
+      "lines": 165
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -365,9 +365,9 @@
     },
     {
       "path": "docs/product-technical-gap-baseline.md",
-      "sha256": "70acfa001c59eef400ea29b0e6cffadef04f0638a3ae5eb346c719dfeeed9818",
-      "bytes": 25424,
-      "lines": 162
+      "sha256": "fcc6a4650202dd62029eb0efe6573571d0fc5de2ba2a69fc561914d8e7b39046",
+      "bytes": 27509,
+      "lines": 170
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "dd652709f47dc0fbb3a38dfda4be966f056a8f5f51967857811a690d58dcb40f",
-      "bytes": 16264,
-      "lines": 409
+      "sha256": "049e3ad6a6c074cd344248846525bd51e571026fa3c92d9aa4b6e5d0838b7026",
+      "bytes": 17429,
+      "lines": 426
     },
     {
       "path": "tests/hr-workspace.test.mjs",

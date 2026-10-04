@@ -112,6 +112,23 @@ test('Job Architecture ownership documents its existing snapshot tables', () => 
   }
 });
 
+test('workspace documentation separates observed source from historical execution', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const gap = readFileSync(new URL('../docs/product-technical-gap-baseline.md', import.meta.url), 'utf8');
+  const status = readme.split('## Status\n')[1];
+  assert.ok(status, 'README must retain its complete status section');
+  assert.match(status, /Observed default `develop` base `eb9757f8649aaad026a9865508d9aad50c1a7a4f`/);
+  assert.match(status, /repository source presence only/);
+  assert.doesNotMatch(status, /Workforce-composition evidence remains active PR #54/);
+  assert.match(gap, /\*\*Historical snapshot:\*\* 2026-08-21, Asia\/Seoul/);
+  assert.match(gap, /## Historical open PR inventory and integration order \(2026-08-21\)/);
+  assert.match(gap, /## Historical local evidence \(2026-08-21\)/);
+  assert.match(gap, /not evidence of configured branch-protection enforcement/);
+  assert.match(gap, /No new all-PR inventory is asserted/);
+  assert.match(gap, /Historical exact-head service and PostgreSQL validation/);
+  assert.match(gap, /parameter_rmse_mean` 2\.9606/);
+});
+
 test('governance docs name the protected default branch rather than stale main', () => {
   const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
   assert.doesNotMatch(agents, /protected[- ](?:`)?main(?:`)?/i);
