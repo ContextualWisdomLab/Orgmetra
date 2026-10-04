@@ -136,7 +136,7 @@ def _line_count(data: bytes) -> int:
 
 
 def _expected_manifest_document() -> dict[str, Any]:
-    """Build deterministic provenance for the exact active branch artifact set."""
+    """Build deterministic artifact integrity for the target; source is not captured."""
     files = []
     for relative_path in sorted(set(REQUIRED) - {"manifest.json"}):
         path = ROOT / relative_path
@@ -154,7 +154,8 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "develop",
+        "target_branch": "develop",
+        "generated_source_branch": None,
         "files": files,
     }
 
@@ -168,10 +169,14 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
-    if manifest.get("generated_for_branch") != "develop":
+    if manifest.get("target_branch") != "develop":
+        _fail("manifest target_branch must identify the intended integration target develop")
+    if "generated_for_branch" in manifest:
+        _fail("manifest generated_for_branch is obsolete; use target_branch")
+    if "generated_source_branch" not in manifest or manifest["generated_source_branch"] is not None:
         _fail(
-            "manifest generated_for_branch must identify the active generation branch "
-            "develop"
+            "manifest generated_source_branch must be null; "
+            "this deterministic producer does not capture generation-source authority"
         )
 
     entries: dict[str, dict[str, Any]] = {}

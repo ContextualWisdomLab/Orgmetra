@@ -1,5 +1,13 @@
 # Operability
 
+## Foundation manifest integrity and uncaptured source
+
+The active-PR manifest contract separates `target_branch: "develop"` (intended integration destination) from `generated_source_branch: null` (generation-source authority was not captured). Null is explicit in every filesystem export, including a named checkout; it is not an archive-only fallback or authenticated branch provenance. The producer never guesses a source from Git, environment variables, PR targets, or caller labels. Validation rejects omitted or non-null source claims, a wrong/missing target, and any legacy `generated_for_branch` field. Matching digest, byte count, line count, and unique normalized path inventory establishes artifact integrity only, not generation-event authority, protection, merge, or release.
+
+After completing all source changes, run `python3 tests/validate_repository.py --print-manifest` against the complete final source and write its actual output to `manifest.json`. Printing is deterministic and read-only; it does not repair the file itself. Never overlay a historical manifest onto newer source. Normal validation remains `npm run validate`; the new offline stdlib manifest regressions are in its existing `tests/workspace-foundation-integration.test.mjs` discovery path, with the unchanged maximum native-child timeout of 15 seconds and fresh temporary manifest roots. They launch no application server, database, network, or credential operation; existing browser/config tests and deadlines remain unchanged.
+
+This is the PR owner's implementation choice under standing user authority, not a new human approval. If an independent review or release contract requires authenticated non-null generation provenance, that remains a separate unmet producer-authority requirement; null and current-checkout observations cannot satisfy it. Independent whole-successor review, normal exact-head CI/security gates, formal approvals, protected integration, host notification, live identity/database evidence, and release obligations remain open.
+
 ## Local browser fixture operation
 
 The active-PR Playwright harness refuses existing servers rather than reusing them. Leave unrelated listeners running; if port 4173 is occupied, choose an available port with `ORGMETRA_WORKSPACE_PORT=43127 npm run test:e2e`. The override accepts only canonical decimal TCP ports 1–65535 and must identify a port available to the fixture; an unset override retains 4173. Do not kill a shared service to make a test pass. Keep the configured case deadlines and recording enabled, and verify the owned fixture exits and its listener closes after the run. Local fixture success is not production, hosted-gate, or merge approval.

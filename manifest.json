@@ -1,7 +1,8 @@
 {
   "package": "orgmetra-foundation-pack",
   "version": "0.1.0",
-  "generated_for_branch": "develop",
+  "target_branch": "develop",
+  "generated_source_branch": null,
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
@@ -41,9 +42,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "93960d783b2f9f4dd8b11e38d40569cbe8a19d7ced4cfa0a04f788b4c5758384",
-      "bytes": 22598,
-      "lines": 95
+      "sha256": "60ba21593d6d5eb2948692656636536701cd314ecd0ec9f597ff6e3513428427",
+      "bytes": 23377,
+      "lines": 96
     },
     {
       "path": "CLAUDE.md",
@@ -191,9 +192,9 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "0f81072b3e76abf1a58a8f4049bd73aeea00fc27ecc419c378a7c53950484c37",
-      "bytes": 13554,
-      "lines": 83
+      "sha256": "5382d3217306178e73585c1da1353f3159322470f2b73d63a94633e7db2495ba",
+      "bytes": 15597,
+      "lines": 91
     },
     {
       "path": "docs/PRD.md",
@@ -557,15 +558,15 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "85a5677706a580776c58c6a6db011a4d4b83e2a6c318a0f1300a601cb90e9924",
-      "bytes": 27905,
-      "lines": 655
+      "sha256": "edd8f4e0b449e88dee5e7c5a151b158ac45ca97084880bf65147c3d530c06177",
+      "bytes": 28293,
+      "lines": 660
     },
     {
       "path": "tests/workspace-foundation-integration.test.mjs",
-      "sha256": "57cd7a081c8e6f5c74cc68674175f8bb8dbe430fcdd98ad33504904b17e3ab8c",
-      "bytes": 6904,
-      "lines": 130
+      "sha256": "2a8266435d837ba445986ee257a6de94eddf687d950a016d4d1348b48618aee7",
+      "bytes": 19601,
+      "lines": 366
     }
   ]
 }
