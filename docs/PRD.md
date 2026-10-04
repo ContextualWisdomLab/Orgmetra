@@ -63,7 +63,11 @@ The checkout also contains a local fixture slice at `apps/hr-workspace/` for
 HR Home and Employee Profile, with a local Storybook runtime for its tokenized
 states. It is an interaction and accessibility contract for the protected
 People API boundary, not a connected or deployed customer workflow until its
-API and browser E2E evidence are merged and released.
+API and browser E2E evidence are merged and released. On the active UI PR,
+editing a People or Job Analysis request field must clear the previously
+shown protected values and invalidate a pending response, even if the user
+restores the old field value. Only a fresh explicit read may display values
+for the current request.
 
 ### P2 scale
 

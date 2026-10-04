@@ -295,6 +295,70 @@ test('only the latest People read may render when responses complete out of orde
   await expect(page.locator('#people-api-employment-status')).toHaveText('active');
 });
 
+for (const fixture of [
+  {
+    name: 'People', view: 'employee-profile', route: '**/v1/tenants/**/people/**',
+    input: '#people-api-person', result: '#people-api-result', status: '#people-api-status',
+    field: '#people-api-display-name', button: 'Load worker record',
+    payload: { fields: { display_name: 'Original worker', employment_status_code: 'active' } },
+    fresh: { fields: { display_name: 'Fresh worker', employment_status_code: 'active' } },
+    expected: 'Fresh worker',
+  },
+  {
+    name: 'Job Analysis', view: 'job-analysis', route: '**/v1/tenants/**/job-analysis-snapshots/**',
+    input: '#job-analysis-record', result: '#job-analysis-result', status: '#job-analysis-status',
+    field: '#job-analysis-analysis-id', button: 'Load snapshot',
+    payload: jobAnalysisSnapshot,
+    fresh: { ...jobAnalysisSnapshot, analysis_record_id: 'analysis-fresh' },
+    expected: 'analysis-fresh',
+  },
+]) {
+  test(`${fixture.name} input edits invalidate a pending read and permit a fresh explicit request`, async ({ page }) => {
+    await injectProtectedReadConfig(page);
+    let markSeen;
+    const seen = new Promise((resolve) => { markSeen = resolve; });
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    let requests = 0;
+    await page.route(fixture.route, async (route) => {
+      requests += 1;
+      if (requests === 1) {
+        markSeen();
+        await held;
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify(requests === 1 ? fixture.payload : fixture.fresh) });
+    });
+    try {
+      await page.goto(workspacePath);
+      await page.locator(`[data-view-link="${fixture.view}"]`).first().click();
+      await page.getByRole('button', { name: fixture.button, exact: true }).click();
+      await seen;
+      const original = await page.locator(fixture.input).inputValue();
+      await page.locator(fixture.input).fill('different-resource');
+      await page.locator(fixture.input).fill(original);
+      await expect(page.locator(fixture.status)).toHaveAttribute('data-state', 'idle');
+      const response = page.waitForResponse((value) => value.url().includes('/v1/tenants/'));
+      release();
+      await (await response).finished();
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await expect(page.locator(fixture.result)).toBeHidden();
+      await expect(page.locator(fixture.field)).toHaveText('unknown');
+      await expect(page.locator(fixture.status)).toHaveAttribute('data-state', 'idle');
+      await page.locator(fixture.input).fill('fresh-resource');
+      await page.getByRole('button', { name: fixture.button, exact: true }).click();
+      await expect(page.locator(fixture.field)).toHaveText(fixture.expected);
+      await expect(page.locator(fixture.result)).toBeVisible();
+      await page.locator(fixture.input).fill('another-resource');
+      await expect(page.locator(fixture.result)).toBeHidden();
+      await expect(page.locator(fixture.field)).toHaveText('unknown');
+      expect(requests).toBe(2);
+    } finally {
+      release();
+    }
+  });
+}
+
 test('keyboard users can bypass repeated workspace navigation', async ({ page }) => {
   await page.goto(workspacePath);
 

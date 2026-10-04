@@ -46,6 +46,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Active-PR protected-read display repair: editing People or Job Analysis request fields clears displayed values and invalidates pending responses, including edit-and-revert sequences. A fresh explicit read remains available. Existing authorization providers, API contracts, no-cookie transport, fixture-only maturity, and browser deadlines are unchanged; Node and Chromium regressions exercise both read views.
 - Active-PR CI dependency-order repair: Foundation installs the reviewed Node lockfile before validation; Recovery provisions the same pinned Node 24 and Python 3.14 runtimes and runs `npm ci` before validation. Existing config-import regressions retain their real Playwright dependency, and integration tests guard the prerequisite order. Dependencies, lockfile, browser behavior, runner selectors, and all quality gates are unchanged; local evidence is not hosted execution or approval.
 - Consolidated repository-owned PR validation from twelve workflows into one Foundation CI job, while keeping the dual-cluster recovery rehearsal separately path-scoped. Central required review and security workflows remain organization-owned.
 - Aligned the English/Korean locale toggle's accessible name with its visible target-language label (`한국어` / `English`) and added exact browser assertions for both language states, following WCAG 2.2 Success Criterion 2.5.3 (Label in Name); the APA 7 W3C citation remains in `docs/doctoring/REFERENCES.md`.

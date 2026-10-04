@@ -41,9 +41,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "a6377129359cfd0bd0f6a0ed9f66eecc7b758136c7846484c326c6db23939b26",
-      "bytes": 20190,
-      "lines": 89
+      "sha256": "0c1cfd316b4d67641275c0f06f4c5d62d7886e574e85038709d5b42175eb703b",
+      "bytes": 20602,
+      "lines": 90
     },
     {
       "path": "CLAUDE.md",
@@ -65,15 +65,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "8c4d750a3815d86fb2a8d33eb1c905b014c16740a99130a94ff53954574c5caf",
-      "bytes": 4046,
-      "lines": 82
+      "sha256": "02dc270595126c8b23ceaedec2b8e31d0b8981558f7b4e6705ca2b8eb39eebec",
+      "bytes": 4349,
+      "lines": 87
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "470e3681a84528cf4a05cd3dd5d23d06d09b2a94cc94c8032b8112744a40cb63",
-      "bytes": 29665,
-      "lines": 442
+      "sha256": "a87f947356e12e00c56a547caa27681621de910644aac827e9062b78bbfc387b",
+      "bytes": 30727,
+      "lines": 465
     },
     {
       "path": "apps/hr-workspace/index.html",
@@ -197,15 +197,15 @@
     },
     {
       "path": "docs/PRD.md",
-      "sha256": "bf73c0ae68f19a24beebd8a43b2e2888ad2e6844697aab8ab5ada59f6c8d87d5",
-      "bytes": 5852,
-      "lines": 117
+      "sha256": "3b1b3179a850cfe8aae85f406b966f9ce37fc51ce26b74f52983cbb25d75ff3e",
+      "bytes": 6122,
+      "lines": 121
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "01918512d8882060e9cff0c4aa8206e0eccbdfb61cfd7f829331123c7a9fe6ac",
-      "bytes": 11185,
-      "lines": 64
+      "sha256": "aba46f99e5f41c0827cf90b1f22e7b1970ebc454bb1d9fd3c60e510fe5ee4aaa",
+      "bytes": 11767,
+      "lines": 74
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -221,8 +221,8 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "ef0986022e0b2b3353a8323283fcd24429063579a62e14fdae95c2ca81420c6d",
-      "bytes": 18894,
+      "sha256": "1bd74bdc769b83be356967c65e49ecfa19179b071ff940fe308b09e657de672b",
+      "bytes": 19382,
       "lines": 158
     },
     {
@@ -233,8 +233,8 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "656e05be99ccec6aa40541105af6ed8010d095363811c26d15283d614c772aa2",
-      "bytes": 11979,
+      "sha256": "8adf34b85123db2b1b2c016beddedb1d373a2549b34229422644535b646e5521",
+      "bytes": 12019,
       "lines": 42
     },
     {
@@ -443,9 +443,9 @@
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "e22202da0b8b075be461865656a5166534ea2c584d2b4704365fca4f12c0aacb",
-      "bytes": 15190,
-      "lines": 320
+      "sha256": "9f84ec5076cef6fa26c740831a3a9eff980f344fef8ec81f5d654bb00ecb3a06",
+      "bytes": 18360,
+      "lines": 384
     },
     {
       "path": "tests/foundation-contract.test.mjs",
@@ -455,9 +455,9 @@
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "26b68a01e6e7664689a3b1749ee7c0760b4a41bf0e2278afa5ab017ba76487e2",
-      "bytes": 10026,
-      "lines": 208
+      "sha256": "486ac359e956bd370c02b68b1cde397e8c13bd6966912ff92b6bf26d951cc074",
+      "bytes": 14536,
+      "lines": 305
     },
     {
       "path": "tests/job-analysis-api-fixture.mjs",

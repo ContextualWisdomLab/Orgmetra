@@ -370,6 +370,18 @@ if (typeof document !== 'undefined') {
   } else {
     setJobAnalysisStatus('jobAnalysisReady');
   }
+  // Editing read coordinates invalidates pending and displayed evidence, even after reverting.
+  const invalidateJobAnalysisRead = () => {
+    jobAnalysisRequestVersion += 1;
+    clearJobAnalysisSnapshot();
+    if (!jobAnalysisConfig?.baseUrl || typeof jobAnalysisConfig?.getAuthorization !== 'function') {
+      setJobAnalysisStatus('jobAnalysisNotConfigured', 'not-configured');
+    } else {
+      setJobAnalysisStatus('jobAnalysisReady');
+    }
+  };
+  jobAnalysisForm.addEventListener('input', invalidateJobAnalysisRead);
+  jobAnalysisForm.addEventListener('change', invalidateJobAnalysisRead);
   jobAnalysisForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!jobAnalysisConfig?.baseUrl || typeof jobAnalysisConfig?.getAuthorization !== 'function') {
@@ -409,6 +421,17 @@ if (typeof document !== 'undefined') {
   } else {
     setPeopleApiStatus('peopleApiReady');
   }
+  const invalidatePeopleRead = () => {
+    peopleApiRequestVersion += 1;
+    clearPeopleRecord();
+    if (!peopleApiConfig?.baseUrl || typeof peopleApiConfig?.getAuthorization !== 'function') {
+      setPeopleApiStatus('peopleApiNotConfigured', 'not-configured');
+    } else {
+      setPeopleApiStatus('peopleApiReady');
+    }
+  };
+  peopleApiForm.addEventListener('input', invalidatePeopleRead);
+  peopleApiForm.addEventListener('change', invalidatePeopleRead);
   peopleApiForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!peopleApiConfig?.baseUrl || typeof peopleApiConfig?.getAuthorization !== 'function') {

@@ -206,3 +206,100 @@ test('People API uses host authorization and an explicit no-storage read boundar
   assert.equal(request.options.headers.Authorization, 'Bearer host-provided-token');
   assert.doesNotMatch(html, /localStorage|sessionStorage|authorization.*input/i);
 });
+
+/** Execute the unchanged workspace handlers with an explicitly held synthetic transport. */
+function protectedReadWorkspace() {
+  const nodes = new Map();
+  const node = (id) => {
+    if (!nodes.has(id)) nodes.set(id, {
+      value: '', hidden: true, textContent: '', dataset: {}, handlers: {},
+      addEventListener(type, callback) { this.handlers[type] = callback; },
+      setAttribute() {}, focus() {},
+    });
+    return nodes.get(id);
+  };
+  const pending = [];
+  const context = {
+    URLSearchParams,
+    document: {
+      documentElement: { dataset: {}, lang: '' },
+      getElementById: node, querySelector: node, querySelectorAll: () => [],
+    },
+    __ORGMETRA_PEOPLE__: {
+      baseUrl: 'https://people.example.test', tenantRecordId: 'tenant-fixture',
+      personRecordId: 'person-fixture', effectiveOn: '2026-10-04',
+      purposeCode: 'people_read', requestedFields: ['display_name'],
+      getAuthorization: () => 'Bearer fixture-only',
+    },
+    __ORGMETRA_JOB_ANALYSIS__: {
+      baseUrl: 'https://job.example.test', tenantRecordId: 'tenant-fixture',
+      analysisRecordId: 'analysis-fixture', purposeCode: 'job_analysis_read',
+      getAuthorization: () => 'Bearer fixture-only',
+    },
+    fetch: () => new Promise((resolve) => pending.push(resolve)),
+  };
+  runInNewContext(app.replace(/^export /gm, ''), context);
+  return { node, pending };
+}
+
+const protectedReadCases = [
+  {
+    kind: 'People', form: 'people-api-form', result: 'people-api-result', status: 'people-api-status',
+    coordinates: ['people-api-tenant', 'people-api-person', 'people-api-effective', 'people-api-purpose', 'people-api-fields'],
+    payload: { fields: { display_name: 'Original worker', employment_status_code: 'active' } },
+    clearedField: 'people-api-display-name',
+  },
+  {
+    kind: 'Job Analysis', form: 'job-analysis-form', result: 'job-analysis-result', status: 'job-analysis-status',
+    coordinates: ['job-analysis-tenant', 'job-analysis-record', 'job-analysis-purpose'],
+    payload: { analysis_record_id: 'analysis-fixture', status_code: 'approved', tasks: [], ksao_requirements: [] },
+    clearedField: 'job-analysis-analysis-id',
+  },
+];
+
+for (const fixture of protectedReadCases) {
+  test(`${fixture.kind} coordinate edits invalidate pending responses even after reverting`, async () => {
+    for (const coordinate of fixture.coordinates) {
+      for (const eventType of ['input', 'change']) {
+        const { node, pending } = protectedReadWorkspace();
+        const form = node(fixture.form);
+        const submitted = form.handlers.submit({ preventDefault() {} });
+        await Promise.resolve();
+        assert.equal(pending.length, 1, 'the actual fetch boundary must be reached');
+        const input = node(coordinate);
+        const original = input.value;
+        input.value = 'changed-coordinate';
+        form.handlers[eventType]?.({ target: input });
+        input.value = original;
+        form.handlers[eventType]?.({ target: input });
+        pending[0]({ status: 200, ok: true, json: async () => fixture.payload });
+        await submitted;
+        assert.equal(node(fixture.result).hidden, true, `${coordinate}/${eventType}: stale data must remain hidden`);
+        assert.equal(node(fixture.clearedField).textContent, 'unknown');
+        assert.equal(node(fixture.status).dataset.state, 'idle');
+      }
+    }
+  });
+
+  test(`${fixture.kind} coordinate edits clear loaded values and allow a fresh explicit read`, async () => {
+    const { node, pending } = protectedReadWorkspace();
+    const form = node(fixture.form);
+    const submit = () => form.handlers.submit({ preventDefault() {} });
+    const first = submit();
+    await Promise.resolve();
+    pending[0]({ status: 200, ok: true, json: async () => fixture.payload });
+    await first;
+    assert.equal(node(fixture.result).hidden, false, 'an unchanged authorized read must still render');
+    node(fixture.coordinates[0]).value = 'changed-tenant';
+    form.handlers.input?.({ target: node(fixture.coordinates[0]) });
+    assert.equal(node(fixture.result).hidden, true, 'an edited form cannot retain the previous resource');
+    assert.equal(node(fixture.clearedField).textContent, 'unknown');
+    const fresh = submit();
+    await Promise.resolve();
+    assert.equal(pending.length, 2);
+    pending[1]({ status: 200, ok: true, json: async () => fixture.payload });
+    await fresh;
+    assert.equal(node(fixture.result).hidden, false);
+    assert.equal(node(fixture.status).dataset.state, 'loaded');
+  });
+}
