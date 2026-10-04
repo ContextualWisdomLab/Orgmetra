@@ -129,6 +129,33 @@ test('workspace documentation separates observed source from historical executio
   assert.match(gap, /parameter_rmse_mean` 2\.9606/);
 });
 
+test('offer approval ADR keeps its exact decision status separate from branch provenance', () => {
+  const adr = readFileSync(new URL('../docs/adr/0017-governed-offer-approval.md', import.meta.url), 'utf8');
+  const index = readFileSync(new URL('../docs/adr/README.md', import.meta.url), 'utf8');
+  const statuses = [...adr.matchAll(/^- Status: (.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(statuses, ['Accepted'], 'decision status must not include a branch or protection claim');
+  const indexed = index.split('\n').find((line) => line.includes('| [0017]'));
+  assert.ok(indexed);
+  assert.equal(indexed.split('|').at(-2).trim(), statuses[0]);
+  assert.match(adr, /^- Provenance: .*develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f.*configured protection remains a separate gap/m);
+  assert.doesNotMatch(adr, /protected `develop` truth|^Protected `develop` can govern/m);
+});
+
+test('Job Analysis traceability includes the persisted snapshot and its contract source', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../database/migrations/0013_job_analysis_snapshot.sql', import.meta.url), 'utf8');
+  const rows = traceability.split('\n').filter((line) => line.startsWith('| Evidence-grounded Job analysis with Task/FJA/KSAO linkage |'));
+  assert.equal(rows.length, 1);
+  for (const table of ['job_analysis_snapshot', 'job_analysis_task_item', 'job_analysis_ksao_item', 'job_analysis_task_ksao_link', 'job_analysis_write_command']) {
+    assert.match(migration, new RegExp(`CREATE TABLE ${table} \\(`));
+    assert.ok(rows[0].includes(`\`${table}\``), `${table} must be traced to its persistence boundary`);
+  }
+  for (const path of ['services/job-analysis-api', 'tests/test_job_analysis_snapshot_postgres.sh']) {
+    assert.ok(rows[0].includes(`\`${path}\``), `${path} must appear in the same evidence row`);
+  }
+  assert.ok(rows[0].includes('ADR-0007, ADR-0014'));
+});
+
 test('governance docs name the protected default branch rather than stale main', () => {
   const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
   assert.doesNotMatch(agents, /protected[- ](?:`)?main(?:`)?/i);

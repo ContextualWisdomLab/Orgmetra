@@ -41,9 +41,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9302249574659c96c0af45bef673c6d2b1e8e11fd735eb5fa4cde19ea34f6010",
-      "bytes": 22186,
-      "lines": 94
+      "sha256": "93960d783b2f9f4dd8b11e38d40569cbe8a19d7ced4cfa0a04f788b4c5758384",
+      "bytes": 22598,
+      "lines": 95
     },
     {
       "path": "CLAUDE.md",
@@ -233,8 +233,8 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "3a6388eb71a2b26c4d6ab0bbb92fe1a3c9ff9b421e8395daeba8efe064a9aae0",
-      "bytes": 12064,
+      "sha256": "bab9e88e979ebbd7a11279cf14f4b66b38705f4cdee5332dcea893def649c616",
+      "bytes": 12370,
       "lines": 42
     },
     {
@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "049e3ad6a6c074cd344248846525bd51e571026fa3c92d9aa4b6e5d0838b7026",
-      "bytes": 17429,
-      "lines": 426
+      "sha256": "e798fb2673e17daee1dcbb7199f9298a7d3a0d71bcc0bede0893ce00151916f5",
+      "bytes": 19411,
+      "lines": 453
     },
     {
       "path": "tests/hr-workspace.test.mjs",
