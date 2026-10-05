@@ -478,6 +478,56 @@ test('current traceability bounds maturity to source evidence without attesting 
   assert.match(keyverseRow[0], /issuer integration remains unverified here/);
 });
 
+/** Check only the named provenance paragraph, not arbitrary documentation prose. */
+function requirePeopleReadRepairProvenance(traceability) {
+  const section = extractSection(traceability, 'Source provenance and maturity limits (2026-10-05)');
+  const paragraph = section.split(/\r?\n\s*\r?\n/).find((entry) => entry.includes('The observed default-branch base'));
+  assert.ok(paragraph, 'traceability must retain its source-provenance paragraph');
+  const normalized = paragraph.replace(/\s+/g, ' ');
+  assert.match(normalized, /develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f/);
+  assert.match(normalized, /People read\/write business and persistence boundaries/,
+    'unchanged business and persistence sources must remain distinct from the read HTTP repair');
+  assert.match(normalized, /People read HTTP error boundary and its regression source are changed by this active PR/,
+    'the read HTTP repair must be attributed to the active PR, not the unchanged base');
+  for (const path of [
+    'services/people-api/src/orgmetra_people_api/http.py',
+    'services/people-api/tests/test_http_route.py'
+  ]) {
+    assert.ok(normalized.includes(`\`${path}\``), `${path}: the actual changed source must be named`);
+  }
+  assert.match(normalized, /protected-branch runtime truth is not established/);
+  assert.doesNotMatch(normalized, /People read\/write, Job Analysis persistence, criterion-observation scope, validity-case integrity, and purpose-bound PII implementation and regression sources are present at that immutable base and unchanged in this PR/,
+    'the earlier blanket unchanged claim must not survive wrapping or an appended correction');
+}
+
+test('People read provenance distinguishes active-PR HTTP repairs from unchanged base boundaries', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  requirePeopleReadRepairProvenance(traceability);
+});
+
+test('People read provenance rejects the prior blanket claim and missing repair attribution', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  requirePeopleReadRepairProvenance(traceability);
+  requirePeopleReadRepairProvenance(traceability.replace('People read HTTP error boundary', 'People read\nHTTP error boundary'));
+  const declaration = 'People read HTTP error boundary and its regression source are changed by this active PR';
+  assert.equal(traceability.split(declaration).length - 1, 1);
+  const missingAttribution = traceability.replace(declaration, 'People read HTTP error boundary and its regression source are present at the base');
+  assert.throws(() => requirePeopleReadRepairProvenance(missingAttribution), {
+    code: 'ERR_ASSERTION',
+    message: /the read HTTP repair must be attributed to the active PR/
+  });
+  const stale = 'People read/write, Job Analysis persistence, criterion-observation scope, validity-case integrity, and purpose-bound PII implementation and regression sources are present at that immutable base and unchanged in this PR.';
+  const contradictory = traceability.replace('The observed default-branch base', stale + ' The observed default-branch base');
+  assert.throws(() => requirePeopleReadRepairProvenance(contradictory), {
+    code: 'ERR_ASSERTION',
+    message: /the earlier blanket unchanged claim must not survive/
+  });
+  assert.throws(() => requirePeopleReadRepairProvenance(contradictory.replace('People read/write, Job Analysis', 'People read/write,\nJob Analysis')), {
+    code: 'ERR_ASSERTION',
+    message: /the earlier blanket unchanged claim must not survive/
+  });
+});
+
 test('foundation validator rejects obsolete protected-main maturity in otherwise-valid matrices', () => {
   const root = temporaryDirectory();
   try {

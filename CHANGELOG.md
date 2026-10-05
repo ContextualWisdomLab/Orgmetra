@@ -6,6 +6,8 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Added
 
+- Active-PR traceability correction: distinguish unchanged baseline People business/persistence boundaries from this PR's read HTTP error handling and regression changes. Paragraph-scoped provenance contracts retain the unverified-protection limit and reject the earlier blanket unchanged attribution, including wrapped contradictory text. This correction does not change People runtime behavior or certify deployment, hosted checks, approval, or release.
+
 - Active-PR People read error-boundary repair: contain unexpected authentication-backend exceptions before protected reads and retain existing 400/401/403/404/405/409/500 responses while adding canonical `error_code`, `next_action`, and random `support_reference` metadata. Bounded local rejection logs share the support reference without credentials, HR values, request identities, or exception text. Existing canonical mutation error envelopes and successful payloads remain unchanged; local regression and coverage evidence do not establish hosted CI, independent approval, deployed authentication, or release.
 
 - Active-PR recovery port wiring repair: each PostgreSQL service exposes container `5432` with an allocated host port, and each administrator URL consumes its own service's `ports[5432]` mapping. Recording-only source contracts use distinct synthetic ports and paired fixed/swapped/shared/wrong/missing controls. PostgreSQL images, health checks, cluster-identity/destructive-operation guards and isolated runner selectors are unchanged. Actual runner capacity, service allocation, cross-cluster restore, hosted execution and independent approval remain separate obligations.
