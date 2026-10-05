@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 import json
 import unittest
@@ -238,6 +239,28 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(authenticator.tokens, ["opaque-token"])
         self.assertEqual(port.calls, [])
 
+    async def test_authenticator_runtime_failure_returns_safe_500_without_read(self) -> None:
+        """Contain identity-backend faults before protected worker values are read."""
+        authenticator = FakeAuthenticator(
+            self.principal, error=RuntimeError("synthetic-identity-failure-sentinel")
+        )
+        port = FakeReadPort(worker_record())
+        app = self._app(authenticator=authenticator, read_port=port)
+
+        try:
+            status, headers, payload = await self._request(app)
+        except Exception as error:
+            self.assertEqual(port.calls, [])
+            self.fail(f"identity failure escaped ASGI as {type(error).__name__}")
+
+        self.assertEqual((status, payload["error"]), (500, "internal_error"))
+        self.assertEqual(headers[b"cache-control"], b"no-store")
+        self.assertEqual(headers[b"vary"], b"Authorization")
+        self.assertNotIn("synthetic-identity-failure-sentinel", json.dumps(payload))
+        self.assertNotIn("opaque-token", json.dumps(payload))
+        self.assertEqual(authenticator.tokens, ["opaque-token"])
+        self.assertEqual(port.calls, [])
+
     async def test_authorization_denial_does_not_read_worker_values(self) -> None:
         port = FakeReadPort(worker_record())
         app = self._app(read_port=port)
@@ -261,6 +284,77 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual((status, payload["error"]), (500, "internal_error"))
         self.assertNotIn("password", json.dumps(payload))
+
+    async def test_read_error_envelopes_preserve_status_and_add_governed_fields(self) -> None:
+        """Require client-safe metadata on every existing read-error category."""
+        cases = (
+            (self._app(), {"method": "POST"}, 405, "method_not_allowed"),
+            (self._app(), {"path": "/v1/unknown"}, 404, "route_not_found"),
+            (self._app(), {"query": b"bogus"}, 400, "invalid_request"),
+            (self._app(), {"headers": []}, 401, "authentication_required"),
+            (self._app(), {"query": b"effective_on=2026-08-17&purpose=unapproved&fields=display_name"}, 403, "access_denied"),
+            (self._app(read_port=FakeReadPort(None)), {}, 404, "worker_not_found"),
+            (self._app(read_port=FakeReadPort(worker_record(person_record_id=OTHER_PERSON))), {}, 409, "worker_integrity_conflict"),
+            (self._app(read_port=ExplodingReadPort()), {}, 500, "internal_error"),
+            (self._app(authenticator=FakeAuthenticator(self.principal, error=RuntimeError("fixture-only-fault"))), {}, 500, "internal_error"),
+        )
+        references: set[str] = set()
+        for app, request, expected_status, expected_code in cases:
+            with self.subTest(error=expected_code, status=expected_status):
+                status, headers, payload = await self._request(app, **request)
+                self.assertEqual(status, expected_status)
+                self.assertEqual(payload.get("error_code"), expected_code)
+                self.assertEqual(payload["error"], expected_code)
+                self.assertEqual(payload["next_action"], payload["message"])
+                self.assertTrue(payload["next_action"])
+                reference = payload["support_reference"]
+                self.assertRegex(reference, r"\Aerr_[A-Za-z0-9_-]{32}\Z")
+                self.assertNotIn(reference, references)
+                references.add(reference)
+                self.assertEqual(headers[b"cache-control"], b"no-store")
+                self.assertEqual(headers[b"vary"], b"Authorization")
+                if status == 401:
+                    self.assertEqual(headers[b"www-authenticate"], b"Bearer")
+                if status == 405:
+                    self.assertEqual(headers[b"allow"], b"GET")
+                serialized = json.dumps(payload)
+                for forbidden in ("fixture-only-fault", "do-not-leak", "opaque-token"):
+                    self.assertNotIn(forbidden, serialized)
+        self.assertEqual(len(references), len(cases))
+        status, _, payload = await self._request(self._app())
+        self.assertEqual(status, 200)
+        self.assertEqual(set(payload), {"resource_reference", "fields"})
+        self.assertEqual(payload["fields"], {"display_name": "Ada Lovelace", "employment_status_code": "active"})
+
+    async def test_read_failures_correlate_safe_support_metadata(self) -> None:
+        """Join random response references to bounded logs without reflecting secrets."""
+        for app in (
+            self._app(read_port=ExplodingReadPort()),
+            self._app(authenticator=FakeAuthenticator(self.principal, error=RuntimeError("fixture-only-fault"))),
+        ):
+            with self.subTest(app=type(app).__name__):
+                with self.assertLogs("orgmetra_people_api.http", level="INFO") as captured:
+                    status, _, payload = await self._request(app)
+                self.assertEqual(status, 500)
+                self.assertEqual(len(captured.records), 1)
+                record = captured.records[0]
+                self.assertEqual(record.support_reference, payload["support_reference"])
+                self.assertEqual(record.error_code, "internal_error")
+                self.assertEqual(record.http_status, 500)
+                serialized = json.dumps(record.__dict__, default=str)
+                for forbidden in ("fixture-only-fault", "do-not-leak", "opaque-token", str(TENANT), str(PERSON)):
+                    self.assertNotIn(forbidden, serialized)
+                self.assertIsNone(record.exc_info)
+
+    async def test_authentication_cancellation_preserves_identity_without_read(self) -> None:
+        """Let task cancellation propagate rather than publishing a false HTTP failure."""
+        fault = asyncio.CancelledError("fixture cancellation")
+        authenticator = FakeAuthenticator(self.principal, error=fault)
+        port = FakeReadPort(worker_record())
+        with self.assertRaises(asyncio.CancelledError) as captured:
+            await self._request(self._app(authenticator=authenticator, read_port=port))
+        self.assertIs(captured.exception, fault)
+        self.assertEqual(port.calls, [])
 
     async def test_non_http_scope_is_rejected_as_programming_error(self) -> None:
         app = self._app(read_port=FakeReadPort(None))
