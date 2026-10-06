@@ -10,7 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import json
+import logging
 import re
+from secrets import token_urlsafe
 from typing import Awaitable, Callable, Mapping, Sequence
 from urllib.parse import parse_qsl
 from uuid import UUID
@@ -28,6 +30,8 @@ from orgmetra_people_api.people import (
 AsgiReceive = Callable[[], Awaitable[dict[str, object]]]
 AsgiSend = Callable[[dict[str, object]], Awaitable[None]]
 
+_LOGGER = logging.getLogger(__name__)
+_SUPPORT_REFERENCE_RANDOM_BYTES = 24
 _ROUTE_PREFIX = ("v1", "tenants")
 _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _FIELD_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
@@ -135,6 +139,16 @@ class PeopleAsgiApp:
                     "message": "Provide one valid Bearer credential and retry.",
                 },
                 extra_headers=((b"www-authenticate", b"Bearer"),),
+            )
+            return
+        except Exception:  # noqa: BLE001 - identity backend failures must remain client-safe.
+            await _send_json(
+                send,
+                status=500,
+                payload={
+                    "error": "internal_error",
+                    "message": "Retry later or contact an Orgmetra operator with non-secret request metadata; never include the bearer token.",
+                },
             )
             return
 
@@ -286,7 +300,28 @@ async def _send_json(
     payload: Mapping[str, object],
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
 ) -> None:
-    """Emit a deterministic JSON response that is never cached as shared PII."""
+    """Emit no-store JSON, adding governed metadata to legacy read errors only.
+
+    Existing canonical mutation envelopes and successful payloads stay unchanged.
+    Support references correlate bounded metadata without recording credentials,
+    HR values, request identifiers, or exception messages.
+    """
+    if status >= 400 and "error_code" not in payload:
+        support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+        payload = {
+            **payload,
+            "error_code": payload["error"],
+            "next_action": payload["message"],
+            "support_reference": support_reference,
+        }
+        _LOGGER.info(
+            "People read request rejected",
+            extra={
+                "error_code": payload["error_code"],
+                "http_status": status,
+                "support_reference": support_reference,
+            },
+        )
     body = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
     headers = (
         (b"content-type", b"application/json"),

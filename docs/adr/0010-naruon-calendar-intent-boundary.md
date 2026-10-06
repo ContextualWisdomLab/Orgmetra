@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted on active PR only. This document is not protected-`develop` product truth until its owning PR integrates.
+Status: Accepted
+
+Provenance: integrated on `develop`; enforceable branch protection is tracked by Orgmetra issue #89.
 
 ## Context
 

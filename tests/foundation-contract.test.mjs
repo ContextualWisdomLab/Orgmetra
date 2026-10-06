@@ -99,6 +99,113 @@ test('canonical foundation passes validation', () => {
   assert.deepEqual(validateFoundation(resolve('.')), []);
 });
 
+test('Job Architecture ownership documents its existing snapshot tables', () => {
+  const architecture = readFileSync(new URL('../ARCHITECTURE.md', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../database/migrations/0013_job_analysis_snapshot.sql', import.meta.url), 'utf8');
+  const rows = architecture.split('\n').filter((line) => line.startsWith('| `job_architecture` |'));
+  assert.equal(rows.length, 1, 'the owning context must have one representative table row');
+  assert.match(rows[0], /job profiles and publication evidence/);
+  assert.match(rows[0], /`job_architecture_role`/);
+  for (const table of ['job_analysis_snapshot', 'job_analysis_task_item', 'job_analysis_ksao_item']) {
+    assert.match(migration, new RegExp(`CREATE TABLE ${table} \\(`), `${table} must exist in the owned migration`);
+    assert.ok(rows[0].includes(`\`${table}\``), `${table} must appear in its owning architecture row`);
+  }
+});
+
+test('workspace documentation separates observed source from historical execution', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const gap = readFileSync(new URL('../docs/product-technical-gap-baseline.md', import.meta.url), 'utf8');
+  const status = readme.split('## Status\n')[1];
+  assert.ok(status, 'README must retain its complete status section');
+  assert.match(status, /Observed default `develop` base `eb9757f8649aaad026a9865508d9aad50c1a7a4f`/);
+  assert.match(status, /repository source presence only/);
+  assert.doesNotMatch(status, /Workforce-composition evidence remains active PR #54/);
+  assert.match(gap, /\*\*Historical snapshot:\*\* 2026-08-21, Asia\/Seoul/);
+  assert.match(gap, /## Historical open PR inventory and integration order \(2026-08-21\)/);
+  assert.match(gap, /## Historical local evidence \(2026-08-21\)/);
+  assert.match(gap, /not evidence of configured branch-protection enforcement/);
+  assert.match(gap, /No new all-PR inventory is asserted/);
+  assert.match(gap, /Historical exact-head service and PostgreSQL validation/);
+  assert.match(gap, /parameter_rmse_mean` 2\.9606/);
+});
+
+/** Check the two version-pinned bibliography records against observed arXiv metadata. */
+function requireOrchestrationReferenceAuthors(references) {
+  const expected = [
+    {
+      id: '2606.21228v2',
+      prefix: 'Tang, Y., Cetin, E., Xu, J., Sun, Q., Nielsen, S., Richard, V., Goda, H., Tymchenko, I., Nguyen, N., Lee, H., Ashiga, M., Kotyan, S., Kuroki, S., & Clanuwat, T. (2026).',
+      title: '*Sakana Fugu technical report*',
+      version: 'Version 2, revised June 23, 2026'
+    },
+    {
+      id: '2512.04695v3',
+      prefix: 'Xu, J., Sun, Q., Schwendeman, P., Nielsen, S., Cetin, E., & Tang, Y. (2026).',
+      title: '*TRINITY: An evolved LLM coordinator*',
+      version: 'Version 3, revised April 27, 2026; first submitted December 4, 2025'
+    }
+  ];
+  for (const record of expected) {
+    const entries = references.split(/\r?\n\s*\r?\n/).filter((entry) => entry.includes(record.id.split('v')[0]));
+    assert.equal(entries.length, 1, `${record.id}: one bibliography entry is required`);
+    assert.ok(entries[0].startsWith(record.prefix), `${record.id}: registered authors must replace organization attribution`);
+    assert.ok(entries[0].includes(record.title), `${record.id}: title must remain associated with its record`);
+    assert.ok(entries[0].includes(`(arXiv:${record.id})`), `${record.id}: observed version must be pinned`);
+    assert.ok(entries[0].includes(record.version), `${record.id}: revision year must be explicit`);
+    assert.ok(entries[0].includes(`https://arxiv.org/abs/${record.id}`), `${record.id}: versioned record must remain locatable`);
+  }
+}
+
+test('orchestration bibliography preserves registered authors and observed revision versions', () => {
+  const references = readFileSync(new URL('../docs/doctoring/REFERENCES.md', import.meta.url), 'utf8');
+  requireOrchestrationReferenceAuthors(references);
+  for (const [id, prefix, oldAttribution] of [
+    ['2606.21228v2', 'Tang, Y., Cetin, E.', 'Fugu Team, Sakana AI'],
+    ['2512.04695v3', 'Xu, J., Sun, Q.', 'Sakana AI']
+  ]) {
+    assert.ok(references.includes(prefix));
+    const originalEntries = references.split(/\r?\n\s*\r?\n/);
+    const contradicted = originalEntries.map((entry) => entry.includes(`(arXiv:${id})`) ? entry.replace(prefix, oldAttribution) : entry).join('\n\n');
+    const changedEntries = contradicted.split(/\r?\n\s*\r?\n/);
+    assert.equal(changedEntries.length, originalEntries.length);
+    const targetIndexes = originalEntries.flatMap((entry, index) => entry.includes(`(arXiv:${id})`) ? [index] : []);
+    assert.equal(targetIndexes.length, 1, `${id}: mutation target must be unique`);
+    const changedIndexes = originalEntries.flatMap((entry, index) => entry !== changedEntries[index] ? [index] : []);
+    assert.deepEqual(changedIndexes, targetIndexes, `${id}: only the identified bibliography record may change`);
+    assert.throws(() => requireOrchestrationReferenceAuthors(contradicted), {
+      code: 'ERR_ASSERTION',
+      message: `${id}: registered authors must replace organization attribution`
+    });
+  }
+});
+
+test('offer approval ADR keeps its exact decision status separate from branch provenance', () => {
+  const adr = readFileSync(new URL('../docs/adr/0017-governed-offer-approval.md', import.meta.url), 'utf8');
+  const index = readFileSync(new URL('../docs/adr/README.md', import.meta.url), 'utf8');
+  const statuses = [...adr.matchAll(/^- Status: (.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(statuses, ['Accepted'], 'decision status must not include a branch or protection claim');
+  const indexed = index.split('\n').find((line) => line.includes('| [0017]'));
+  assert.ok(indexed);
+  assert.equal(indexed.split('|').at(-2).trim(), statuses[0]);
+  assert.match(adr, /^- Provenance: .*develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f.*configured protection remains a separate gap/m);
+  assert.doesNotMatch(adr, /protected `develop` truth|^Protected `develop` can govern/m);
+});
+
+test('Job Analysis traceability includes the persisted snapshot and its contract source', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../database/migrations/0013_job_analysis_snapshot.sql', import.meta.url), 'utf8');
+  const rows = traceability.split('\n').filter((line) => line.startsWith('| Evidence-grounded Job analysis with Task/FJA/KSAO linkage |'));
+  assert.equal(rows.length, 1);
+  for (const table of ['job_analysis_snapshot', 'job_analysis_task_item', 'job_analysis_ksao_item', 'job_analysis_task_ksao_link', 'job_analysis_write_command']) {
+    assert.match(migration, new RegExp(`CREATE TABLE ${table} \\(`));
+    assert.ok(rows[0].includes(`\`${table}\``), `${table} must be traced to its persistence boundary`);
+  }
+  for (const path of ['services/job-analysis-api', 'tests/test_job_analysis_snapshot_postgres.sh']) {
+    assert.ok(rows[0].includes(`\`${path}\``), `${path} must appear in the same evidence row`);
+  }
+  assert.ok(rows[0].includes('ADR-0007, ADR-0014'));
+});
+
 test('governance docs name the protected default branch rather than stale main', () => {
   const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
   assert.doesNotMatch(agents, /protected[- ](?:`)?main(?:`)?/i);
@@ -267,6 +374,15 @@ test('local links validate files and ignore anchors, web, and mail links', () =>
   }
 });
 
+test('ADR index keeps provenance outside canonical status cells', () => {
+  const indexText = readFileSync(new URL('../docs/adr/README.md', import.meta.url), 'utf8');
+  assert.doesNotMatch(
+    indexText,
+    /\|\s*(?:Proposed|Accepted|Superseded|Rejected)\s+on\s+[^|]+\|/,
+    'ADR status cells must remain canonical; branch provenance belongs in a separate column'
+  );
+});
+
 test('ADR index reports missing files and status mismatch', () => {
   const root = temporaryDirectory();
   try {
@@ -341,6 +457,113 @@ test('foundation validator accepts ordinary prose containing placeholder vocabul
       '# Valid\n\nThe placeholder wording was intentionally replaced before this review.\n'
     );
     assert.deepEqual(validateFoundation(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('current traceability bounds maturity to source evidence without attesting protection', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  for (const section of ['2. Product traceability matrix', '4. CWL integration traceability']) {
+    const cells = extractMaturityCells(extractSection(traceability, section));
+    assert.ok(cells.length > 0, `${section}: the actual matrix must be inspected`);
+    assert.equal(cells.some((cell) => cell.startsWith('implemented_on_protected_')), false,
+      'a current protected classification requires evidence not captured in this source assessment');
+  }
+  assert.match(traceability, /develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f/);
+  assert.match(traceability, /not a claim that implementation is new or absent from the default-branch base/);
+  const keyverseRow = traceability.split('\n').filter((line) => line.startsWith('| Keyverse identity and authorization |'));
+  assert.equal(keyverseRow.length, 1);
+  assert.equal(keyverseRow[0].split('|').at(-2).trim(), 'accepted_architecture');
+  assert.match(keyverseRow[0], /issuer integration remains unverified here/);
+});
+
+/** Check only the named provenance paragraph, not arbitrary documentation prose. */
+function requirePeopleReadRepairProvenance(traceability) {
+  const section = extractSection(traceability, 'Source provenance and maturity limits (2026-10-05)');
+  const paragraph = section.split(/\r?\n\s*\r?\n/).find((entry) => entry.includes('The observed default-branch base'));
+  assert.ok(paragraph, 'traceability must retain its source-provenance paragraph');
+  const normalized = paragraph.replace(/\s+/g, ' ');
+  assert.match(normalized, /develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f/);
+  assert.match(normalized, /People read\/write business and persistence boundaries/,
+    'unchanged business and persistence sources must remain distinct from the read HTTP repair');
+  assert.match(normalized, /People read HTTP error boundary and its regression source are changed by this active PR/,
+    'the read HTTP repair must be attributed to the active PR, not the unchanged base');
+  for (const path of [
+    'services/people-api/src/orgmetra_people_api/http.py',
+    'services/people-api/tests/test_http_route.py'
+  ]) {
+    assert.ok(normalized.includes(`\`${path}\``), `${path}: the actual changed source must be named`);
+  }
+  assert.match(normalized, /protected-branch runtime truth is not established/);
+  assert.doesNotMatch(normalized, /People read\/write, Job Analysis persistence, criterion-observation scope, validity-case integrity, and purpose-bound PII implementation and regression sources are present at that immutable base and unchanged in this PR/,
+    'the earlier blanket unchanged claim must not survive wrapping or an appended correction');
+}
+
+test('People read provenance distinguishes active-PR HTTP repairs from unchanged base boundaries', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  requirePeopleReadRepairProvenance(traceability);
+});
+
+test('People read provenance rejects the prior blanket claim and missing repair attribution', () => {
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+  requirePeopleReadRepairProvenance(traceability);
+  requirePeopleReadRepairProvenance(traceability.replace('People read HTTP error boundary', 'People read\nHTTP error boundary'));
+  const declaration = 'People read HTTP error boundary and its regression source are changed by this active PR';
+  assert.equal(traceability.split(declaration).length - 1, 1);
+  const missingAttribution = traceability.replace(declaration, 'People read HTTP error boundary and its regression source are present at the base');
+  assert.throws(() => requirePeopleReadRepairProvenance(missingAttribution), {
+    code: 'ERR_ASSERTION',
+    message: /the read HTTP repair must be attributed to the active PR/
+  });
+  const stale = 'People read/write, Job Analysis persistence, criterion-observation scope, validity-case integrity, and purpose-bound PII implementation and regression sources are present at that immutable base and unchanged in this PR.';
+  const contradictory = traceability.replace('The observed default-branch base', stale + ' The observed default-branch base');
+  assert.throws(() => requirePeopleReadRepairProvenance(contradictory), {
+    code: 'ERR_ASSERTION',
+    message: /the earlier blanket unchanged claim must not survive/
+  });
+  assert.throws(() => requirePeopleReadRepairProvenance(contradictory.replace('People read/write, Job Analysis', 'People read/write,\nJob Analysis')), {
+    code: 'ERR_ASSERTION',
+    message: /the earlier blanket unchanged claim must not survive/
+  });
+});
+
+test('foundation validator rejects obsolete protected-main maturity in otherwise-valid matrices', () => {
+  const root = temporaryDirectory();
+  try {
+    makeMinimalValidFoundation(root);
+    const original = readFileSync(join(root, 'docs/TRACEABILITY.md'), 'utf8');
+    const currentValues = [
+      'implemented_on_protected_develop',
+      'implemented_on_active_pr',
+      'accepted_architecture',
+      'planned',
+      'research_only',
+      'superseded',
+      'out_of_scope'
+    ];
+    for (const originalValue of ['accepted_architecture', 'planned']) {
+      for (const currentValue of currentValues) {
+        write(root, 'docs/TRACEABILITY.md', original.replace(
+          `| ${originalValue} |`, `| ${currentValue} |`
+        ));
+        assert.deepEqual(validateFoundation(root), [], `${originalValue}: ${currentValue}`);
+      }
+      const legacy = original.replace(
+        `| ${originalValue} |`, '| implemented_on_protected_main |'
+      );
+      const sectionName = originalValue === 'accepted_architecture'
+        ? '2. Product traceability matrix' : '4. CWL integration traceability';
+      assert.deepEqual(extractMaturityCells(extractSection(legacy, sectionName)), [
+        'implemented_on_protected_main'
+      ], 'the legacy row must reach the canonical maturity consumer');
+      write(root, 'docs/TRACEABILITY.md', legacy);
+      assert.deepEqual(validateFoundation(root), [
+        'docs/TRACEABILITY.md: invalid maturity value: implemented_on_protected_main'
+      ], `${sectionName}: obsolete maturity must be the only rejection`);
+      write(root, 'docs/TRACEABILITY.md', original);
+      assert.deepEqual(validateFoundation(root), [], 'restoring the valid row must restore admission');
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

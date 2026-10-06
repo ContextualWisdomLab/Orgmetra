@@ -1,19 +1,32 @@
 {
   "package": "orgmetra-foundation-pack",
   "version": "0.1.0",
-  "generated_for_branch": "feat/audit-outbox-envelope",
+  "target_branch": "develop",
+  "generated_source_branch": null,
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "b6a4365936b66803a8112f034c77d53d33301a7a798ed4f68746a4f2d8b081d7",
-      "bytes": 6651,
-      "lines": 125
+      "sha256": "b66a63157208934eb459f9d6e103628757de4c51c6d7fd81c3761790b02ea5e6",
+      "bytes": 7621,
+      "lines": 145
     },
     {
       "path": ".gitignore",
-      "sha256": "145fda644f5209fa1fb3e3b40c9af9258bfac6d1a634bba2520fd08fe6d77a21",
-      "bytes": 375,
-      "lines": 37
+      "sha256": "251c57f25b9fd862b3a914aa52987474ec5bc9660d8071d1aa7f1141ea103ca1",
+      "bytes": 439,
+      "lines": 41
+    },
+    {
+      "path": ".storybook/main.js",
+      "sha256": "210d8108637ccea90d2c52e2eec793a9215cc512012a2292ab4abf50983a134d",
+      "bytes": 253,
+      "lines": 8
+    },
+    {
+      "path": ".storybook/preview.js",
+      "sha256": "0f02687d3c76745afea6402607b06b893a0e88f8414dba4d79e39f50f4d17817",
+      "bytes": 336,
+      "lines": 13
     },
     {
       "path": "AGENTS.md",
@@ -23,15 +36,15 @@
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "52d68786f7359c1a50d804996021e4c70e90accd2fff6f1a27c91de1dd8df850",
-      "bytes": 7864,
+      "sha256": "d974b7e6f0ec17e321887e208e6f893a557546206b367fec63e112410618c0df",
+      "bytes": 7908,
       "lines": 107
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "0e0317bcaa066d6eeb2ff2c5169ae1e0d04d48e581dbf0f95bcac701d92fea59",
+      "bytes": 28871,
+      "lines": 110
     },
     {
       "path": "CLAUDE.md",
@@ -53,9 +66,33 @@
     },
     {
       "path": "README.md",
-      "sha256": "1a9fc400d26d8137ae5911488794a6d3fa915957c95f27b36a48cef0fdf823c6",
-      "bytes": 3785,
-      "lines": 81
+      "sha256": "1e2ca561bca7fc90b3439cc06b9be71fac1eb7657f895fec12d095587e9b77a2",
+      "bytes": 4756,
+      "lines": 89
+    },
+    {
+      "path": "apps/hr-workspace/app.js",
+      "sha256": "2ed60b1e5d76592a5fab1fce978789643644894d551d001668620b95989c9929",
+      "bytes": 32014,
+      "lines": 480
+    },
+    {
+      "path": "apps/hr-workspace/index.html",
+      "sha256": "94688218fe12a3a2f47cb666abd90f609130f930a5f3f84319ec2ad4d2405434",
+      "bytes": 19897,
+      "lines": 159
+    },
+    {
+      "path": "apps/hr-workspace/styles.css",
+      "sha256": "3751c1abbd8863040cdf61adf65a4fee9d00f78a9848e4a6b01a71b06b961926",
+      "bytes": 10731,
+      "lines": 122
+    },
+    {
+      "path": "apps/hr-workspace/workspace.stories.js",
+      "sha256": "b4e2820c3aa5e08bde95592c3d47012eecc8d3f968fe511231f2e258124d7ee5",
+      "bytes": 7641,
+      "lines": 134
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
@@ -155,21 +192,21 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "82b2d3e70cec371ef35e9e0f982ac40fef84351976bc04b863b81d27023d5a62",
-      "bytes": 11189,
-      "lines": 71
+      "sha256": "5382d3217306178e73585c1da1353f3159322470f2b73d63a94633e7db2495ba",
+      "bytes": 15597,
+      "lines": 91
     },
     {
       "path": "docs/PRD.md",
-      "sha256": "3ad85ae633cce0fc7a93af39b21d7a7c70bb2efa786da6b12f3c5327906e34f1",
-      "bytes": 5490,
-      "lines": 111
+      "sha256": "81e3060f07cb8dd219926ad844f260d1cfd20d7b19cbcfe8d67dc3f2e69b0264",
+      "bytes": 6327,
+      "lines": 123
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "01918512d8882060e9cff0c4aa8206e0eccbdfb61cfd7f829331123c7a9fe6ac",
-      "bytes": 11185,
-      "lines": 64
+      "sha256": "ed7fc75a07ff29ca5019f2dce0f1acf61e317b9725f89d1f07034e7e34ebcad3",
+      "bytes": 13509,
+      "lines": 96
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -179,15 +216,15 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "82f79029b3c2b7a45393bad5ba8fabe61014d4b6149c7d4e73f70ba447f885e9",
-      "bytes": 1389,
-      "lines": 50
+      "sha256": "d3d630bf1bc67664a419d28fdc3ba1e5fa1dc419747869c426f7fe196212374f",
+      "bytes": 5123,
+      "lines": 107
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d0a0bc3b54ed0fc7973747987f1afb117d6144c390b51ed9370eb571972a33f8",
-      "bytes": 16534,
-      "lines": 135
+      "sha256": "cdd8d21294d5bfe172b2a7f4d9592449b95f18703254ef9c139a19104b63540b",
+      "bytes": 20163,
+      "lines": 165
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -197,9 +234,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "dbf6fd91375ea28e05456d2a0c9ba629506cbac6f52f5dfda61ae68db2395f7e",
-      "bytes": 11462,
-      "lines": 40
+      "sha256": "5c321cbdbe70b40557c09c63f15b03c508d94014cbcf894a5100a0e8a223d793",
+      "bytes": 14724,
+      "lines": 48
     },
     {
       "path": "docs/TRD.md",
@@ -221,9 +258,9 @@
     },
     {
       "path": "docs/WIREFRAMES.md",
-      "sha256": "b03aa6419aeaf5d42a5698c4d43a434c1633b7ac6fd0b0bd0cda979077adc56e",
-      "bytes": 2005,
-      "lines": 77
+      "sha256": "50b9d2737ed88636fc416e1ae6c22b9258a7b5fff80e233f06c5e4cdd3f58099",
+      "bytes": 2994,
+      "lines": 87
     },
     {
       "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
@@ -257,14 +294,14 @@
     },
     {
       "path": "docs/adr/0006-governed-audit-outbox-envelope.md",
-      "sha256": "827298ddd997b47f78a89e89911ad8ea72e517b7714303637f0329b8cb52cabd",
-      "bytes": 14100,
-      "lines": 66
+      "sha256": "58a460f3d25d125c8fc683f5a37616bb6f81eaf897d7eb70572d092eafc02a28",
+      "bytes": 14185,
+      "lines": 67
     },
     {
       "path": "docs/adr/0007-governed-job-analysis-evidence.md",
-      "sha256": "953c6d2b9864a78b461b576092ec3f198f0b76709eaaaf7d0ed0182f95182c52",
-      "bytes": 5653,
+      "sha256": "be665cb6132fd8acd60c00623b1f69fce97d2b301e0c87df3a0925643459c0e3",
+      "bytes": 5605,
       "lines": 57
     },
     {
@@ -281,21 +318,21 @@
     },
     {
       "path": "docs/adr/0010-naruon-calendar-intent-boundary.md",
-      "sha256": "3e1050a964cc4ed76a1a0cf1e699ae5080acf8c9336f0decdd6d5229359db3c9",
-      "bytes": 3917,
-      "lines": 35
+      "sha256": "0d79e9cce84d3f15ffbe88c42840690616d278a0e999dcef4b7ea19ec7c813cb",
+      "bytes": 3921,
+      "lines": 37
     },
     {
       "path": "docs/adr/0011-bitemporal-workforce-composition.md",
-      "sha256": "dbe96dfd47066288cec835789de54cc4293f920d2ad4b0e0dba930191d7d249b",
+      "sha256": "a898da8335f4ea394d89063468b4e0bb00bdc586f8348e222f72f362169318d8",
       "bytes": 5551,
-      "lines": 53
+      "lines": 55
     },
     {
       "path": "docs/adr/0012-governed-migration-handoff.md",
-      "sha256": "c7bfbda34996f717ed31f8307acc16a5d69ae464edb184ab5c8ec4b2d5763cbc",
-      "bytes": 5958,
-      "lines": 59
+      "sha256": "a93fcca51799df9e8166aedc054de3ca15e6f7b8ef9f00e6c78eb964ec00519c",
+      "bytes": 5966,
+      "lines": 61
     },
     {
       "path": "docs/adr/0013-governed-requisition-review-packet.md",
@@ -305,21 +342,33 @@
     },
     {
       "path": "docs/adr/0014-job-analysis-snapshot-persistence.md",
-      "sha256": "a7ab6fee50aaa63f7f407516a4cb39885faeb0fc6e5035ee8fc352ed73430105",
-      "bytes": 5365,
+      "sha256": "a3d7e8c2234d48183433b0d06795534a8ef8b2d7b6298bed5574e088ebdae656",
+      "bytes": 5333,
       "lines": 49
     },
     {
+      "path": "docs/adr/0026-product-technical-gap-baseline.md",
+      "sha256": "6d3f463e1601b0a6d5c9f404a8f866aa5ec7ea30b512b2c5251dfb5c3f42b3b4",
+      "bytes": 3133,
+      "lines": 32
+    },
+    {
       "path": "docs/adr/README.md",
-      "sha256": "f3b3b5ed3b3b31a40a0a3696abf0065e3c25879b6be50077f38ffae742b9d002",
-      "bytes": 1838,
-      "lines": 18
+      "sha256": "f25a8f52936bf02182545f1a91b897fabba5debd272e80f0260757b7a33d5c41",
+      "bytes": 2697,
+      "lines": 23
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "929f7ee36df16279f028f726fcf039982180deb377746fe3804f3c0d090778d5",
-      "bytes": 6352,
-      "lines": 69
+      "sha256": "63e9cbf225000be43826b5240da338946a58ff650779b5d6a0123628a1683982",
+      "bytes": 7652,
+      "lines": 85
+    },
+    {
+      "path": "docs/product-technical-gap-baseline.md",
+      "sha256": "fcc6a4650202dd62029eb0efe6573571d0fc5de2ba2a69fc561914d8e7b39046",
+      "bytes": 27509,
+      "lines": 170
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -334,10 +383,16 @@
       "lines": 187
     },
     {
+      "path": "package-lock.json",
+      "sha256": "7f737a6adf592e4b9370abbe7de08599a7038e234f8db13aba020fbc0ba80734",
+      "bytes": 107967,
+      "lines": 3284
+    },
+    {
       "path": "package.json",
-      "sha256": "59ae9e3e67c3fba9320cb18439692395cdfd16ae5c24e3c4cf30d77d63ebabb5",
-      "bytes": 388,
-      "lines": 9
+      "sha256": "8276ab9ab644f8fcc1a6f9ef57636d79f2e39aa8da308f08a5813f9d93fd2983",
+      "bytes": 809,
+      "lines": 19
     },
     {
       "path": "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
@@ -352,6 +407,12 @@
       "lines": 200
     },
     {
+      "path": "playwright.config.mjs",
+      "sha256": "8de52e4f5a8f59f8b8814e90678c89c108fffa7ce1275e37b15b4adb02fc0d30",
+      "bytes": 1205,
+      "lines": 38
+    },
+    {
       "path": "schemas/openapi.yaml",
       "sha256": "09c1e43486779198574fe31b8bcabbd1c1f74beec7bf86245ae578061619838f",
       "bytes": 29503,
@@ -359,9 +420,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "9b03efbbdffa60a05f5924e8a61b1cbc3cd75c502df428a5920085e8d0bf3603",
-      "bytes": 28121,
-      "lines": 688
+      "sha256": "79ae4f162a3bd762d16aab979da4d111416f04b9ec78797e03bf5ebb4b0b6295",
+      "bytes": 28722,
+      "lines": 704
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -371,15 +432,39 @@
     },
     {
       "path": "tests/dispatcher-inventory.test.mjs",
-      "sha256": "09f5e64410e6b7a26bf8d6ce61c50b737da2ea85d955f91eba63aa21f1537261",
-      "bytes": 1597,
-      "lines": 34
+      "sha256": "c1b9a05c82ffdd95fa874a26819f1be47ac2646e391b0cc86d39b0549e9431c5",
+      "bytes": 2160,
+      "lines": 47
+    },
+    {
+      "path": "tests/e2e/hr-workspace-core-model.spec.mjs",
+      "sha256": "b4a328a7756723b0dbdca44d1b6bd2f3240c72751dc1b5f793d4b658c63da329",
+      "bytes": 1319,
+      "lines": 27
+    },
+    {
+      "path": "tests/e2e/hr-workspace.spec.mjs",
+      "sha256": "5b9610d26c4e7c125d89ce2b9dbdbaffd9a39fb089aa7add13028771d4fea2d6",
+      "bytes": 21825,
+      "lines": 447
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "648533b4aff8cee643df4afc06b463eda788e002e11d043971c8a16804c68501",
-      "bytes": 14943,
-      "lines": 387
+      "sha256": "bf535b963debf1855fdde59bbf1da8e94cffa4ac777d891e1323a630f88b05f0",
+      "bytes": 29053,
+      "lines": 610
+    },
+    {
+      "path": "tests/hr-workspace.test.mjs",
+      "sha256": "4589ffd8afa5f8afcb0ed725a54b60b8fe6270b7c5ea08805ebd301aa655c446",
+      "bytes": 26479,
+      "lines": 501
+    },
+    {
+      "path": "tests/job-analysis-api-fixture.mjs",
+      "sha256": "7af2654ad70852509bece5e51c88111898168f224eecc501c1910b60a10c3959",
+      "bytes": 1728,
+      "lines": 48
     },
     {
       "path": "tests/openapi-contract.test.mjs",
@@ -422,6 +507,12 @@
       "sha256": "57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7",
       "bytes": 11349,
       "lines": 370
+    },
+    {
+      "path": "tests/test_github_actions_runner_image.py",
+      "sha256": "f0962acafa377c7198c4e1228428bd4b8294e1af3f518871c1cb16420b8afe81",
+      "bytes": 20874,
+      "lines": 439
     },
     {
       "path": "tests/test_job_analysis_snapshot_postgres.sh",
@@ -467,9 +558,15 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "091836b2f68600a30b08f7da2cea8b3bef10201a123da720a7369bf10985eec2",
-      "bytes": 27237,
-      "lines": 637
+      "sha256": "edd8f4e0b449e88dee5e7c5a151b158ac45ca97084880bf65147c3d530c06177",
+      "bytes": 28293,
+      "lines": 660
+    },
+    {
+      "path": "tests/workspace-foundation-integration.test.mjs",
+      "sha256": "2a8266435d837ba445986ee257a6de94eddf687d950a016d4d1348b48618aee7",
+      "bytes": 19601,
+      "lines": 366
     }
   ]
 }

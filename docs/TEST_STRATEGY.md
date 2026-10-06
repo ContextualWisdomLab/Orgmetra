@@ -7,10 +7,15 @@ This document is the canonical owned-code coverage requirement. Every production
 The current foundation pack is executable documentation. Its validation command is:
 
 ```text
+npm ci
 npm run validate
 ```
 
 The command runs Python repository-integrity validation, the dependency-free Node foundation validator, Node regression tests, and mutation-style OpenAPI operation-contract tests. It must fail on a missing required artifact, manifest mismatch, invalid database name, missing tenant/evidence/audit/temporal DDL contract, incomplete high-risk OpenAPI operation context, empty OpenID Connect scope requirement, internal trace identifier in a client error schema, explicit unfinished-work marker, unbalanced Markdown fence, or incomplete Apache-2.0 license. Ordinary explanatory prose may contain words such as `placeholder`; only explicit TODO/TBD/FIXME marker forms are treated as unfinished work.
+
+The install must include the reviewed development dependencies: `npm run validate` imports the actual Playwright config through the existing integration tests. Both active-PR workflows provision pinned Node 24 and run `npm ci` before validation; Recovery also provisions Foundation's pinned Python 3.14 runtime for its Python consumers. The ordering regression is checked in `tests/workspace-foundation-integration.test.mjs`. Inherited or symlinked `node_modules` does not establish clean-checkout execution.
+
+Python service tests use each service's project metadata, local `uv` source mappings, and checked lockfile. The canonical Job Analysis command is `uv run --project services/job-analysis-api --extra test pytest services/job-analysis-api/tests`; it resolves the owned HRIS kernel and Keyverse adapter from the repository and does not depend on a manually supplied `PYTHONPATH`.
 
 ## Foundation test matrix
 
@@ -34,11 +39,15 @@ The command runs Python repository-integrity validation, the dependency-free Nod
 | Tenant/actor/purpose authorization matrix and negative high-impact commands | service-specific unit and integration test commands recorded in each service package |
 | AsyncAPI/CloudEvents envelope compatibility | provider and consumer contract test commands recorded beside the versioned event schema |
 | External adapter timeout, malformed response, tenant mismatch, and unavailable-state handling | fake-server tests in each adapter package |
-| Role-workspace keyboard, focus, exact-value, permission-denied, and confirmation states | Storybook interaction/a11y tests plus browser E2E for the owning workspace |
+| Role-workspace keyboard, focus, exact-value, permission-denied, and confirmation states | Storybook interaction/a11y tests plus `npm run test:e2e` for the owning workspace |
 
 The PostgreSQL scripts apply the checked-in migration chain required by the contract under test to a fresh database. The bitemporal and evidence-sealing tests execute concurrency regressions with an observable database barrier instead of a fixed scheduling assumption. The tenant-isolation test proves both read and write enforcement with unprivileged `NOLOGIN NOBYPASSRLS` roles, so table-owner/superuser bypass cannot manufacture a passing tenant result. The evidence-sealing test compares database output with independently precomputed canonical SHA-256 fixtures and forces a membership transaction to hold the evidence-set row lock before finalization, proving the digest snapshot includes evidence that committed first. The audit/outbox contract stores exact `AuditOutboxEvent.canonical_json()` bytes, independently verifies their SHA-256 digest in PostgreSQL, rejects extra top-level PII fields even when a caller recomputes the digest, and exercises outbox lifecycle invariants separately from immutable audit facts. The outbox-claim contract proves an already-expired lease cannot be created, verifies deterministic tenant-scoped claims return the immutable event/digest while live leases are excluded, then lets a valid one-second lease expire and requires atomic takeover of that same row with attempt count 2, a new future lease, and explicit `lease_expired` evidence. The dead-letter contract applies migrations 0001 through 0007, proves the dispatcher cannot select its own terminal attempt budget, rejects direct terminal DML before matching immutable escalation evidence and the stored budget are satisfied, exercises the real retry/claim path through the database-owned default fifth attempt, rejects retry at attempt five, lets the final lease expire, proves a replacement worker cannot create attempt six, proves the row remains bound to the recorded worker identity, rejects a foreign finalizer, permits that exact recorded identity to append terminal evidence after expiry, and rejects fabricated escalation evidence for nonterminal work. The People mutation idempotency contract applies the authoritative migration chain through 0012, verifies the replay record is written in the same transaction as its authoritative fact and audit/outbox evidence, proves rollback leaves no false replay marker, and uses concurrent exact-key sessions to prove one canonical committed identity wins without duplicate business facts. Foundation CI executes every matrix entry independently; a cancelled, skipped, queued, absent, neutral, failed, stale, predecessor-head, status-only, or model-only matrix result is not database evidence for the current head.
 
 Future service packages must publish their exact test, statement-coverage, branch-coverage, docstring, typecheck, and build commands in the package manifest and CI log.
+
+## Browser fixture ownership
+
+The active-PR browser harness always starts its own loopback HTTP fixture; it never reuses an existing server, even outside CI. An occupied target URL fails before browser cases execute instead of accepting a foreign HTTP 200 response. `ORGMETRA_WORKSPACE_PORT` may select a distinct available port for concurrent local fixtures; an unset variable preserves port 4173. Overrides must be canonical ASCII decimal TCP ports from 1 through 65535, without signs, leading zeroes, whitespace, or other syntax, and invalid values fail during config import before server launch. The 15-second case timeout, 5-second assertion timeout, failure recording, and original 13 browser cases remain unchanged. Two additional Chromium cases hold a protected response while the user edits and reverts its request fields; the old response must remain hidden, a fresh explicit read must render, and a later edit must clear loaded values. One further Chromium case changes the personal-details fixture purpose after allowed and denied reviews, requires both previous states to clear, and proves that only a fresh explicit review displays the next outcome. Node handler regressions exercise that purpose selector and every People and Job Analysis request coordinate for both input and change events. These synthetic transport cases prove local display ownership, not live authentication, database authorization, or released customer acceptance. Config-import regressions run through `tests/workspace-foundation-integration.test.mjs` in `npm run validate`; these local harness contracts are not hosted-gate or deployment approval.
 
 ## High-impact decision tests
 
@@ -133,3 +142,24 @@ A model that omits evidence for a structural feature it uses is not eligible for
 - Permission-denied and Keyverse-unavailable states.
 - High-risk review, confirmation, recording, and audit states.
 - Narrow viewport, 200% zoom/reflow, reduced-motion, and high-contrast review.
+
+The current HR workspace browser contract runs Chromium against the static
+workspace with Playwright. It covers the Employee Profile permission boundary,
+English/Korean accessible labels, required-reason focus behavior, host-injected
+People and Job Analysis reads, authorization/purpose request data, and denied
+read errors without fixture fallback. The Chromium host-authority event case
+covers synchronous clearing of both surfaces, all rendered-field scrubbing, and
+fresh explicit reads. Separate Node VM cases cover repeated notifications and
+held success/JSON/denial/body-error outcomes with distinct fresh values and
+current denial. Those Node outcomes are not browser-executed schedules. These
+synthetic host and transport controls do not establish actual host notification
+timing, live account changes, request cancellation, or released identity
+integration. Run the browser contract with:
+
+```text
+npm run test:e2e
+```
+
+The browser contract is executable local/CI evidence; it does not promote the
+fixture to a connected production deployment or authorize an employment
+decision.

@@ -1,1 +1,30 @@
-{"package":"orgmetra-recovery-rehearsal","version":"0.1.0","files":[{"path":".github/workflows/recovery-rehearsal-quality.yml","sha256":"b2fe78ca19946aa1082d1a756fd277766908b49153d7cc8fc7184dceebdca078","bytes":4156,"lines":111},{"path":"docs/traceability/restore-rehearsal.md","sha256":"e4cf63847d03ad890918234d36b338a5f7c0b5561b86ca8bfcfb7cca416eedd4","bytes":7209,"lines":42},{"path":"tests/recovery-rehearsal.test.mjs","sha256":"0102e526fcb5f1d8809b3ffd02aec32075bf1a6e28462432e122a49c0bc9d6e6","bytes":8695,"lines":140},{"path":".github/scripts/restore-rehearsal-postgres.sh","sha256":"7b2e468898d5cae9897dc0337da5ce4e229fe9d980d2961b648a558081fdf5fe","bytes":17307,"lines":412}]}
+{
+  "package": "orgmetra-recovery-rehearsal",
+  "version": "0.1.0",
+  "files": [
+    {
+      "path": ".github/workflows/recovery-rehearsal-quality.yml",
+      "sha256": "08abca6f783154a2cd239c131bc174d0908d14dbf3f0d4472cf4557a264ce3b6",
+      "bytes": 5330,
+      "lines": 135
+    },
+    {
+      "path": "docs/traceability/restore-rehearsal.md",
+      "sha256": "1ab905d5d8faea270c65ec26e53bf6883a0768f6509c999208b3db68a0c512e3",
+      "bytes": 9652,
+      "lines": 48
+    },
+    {
+      "path": "tests/recovery-rehearsal.test.mjs",
+      "sha256": "853cafe6aacdf0f093c518ad62d9618fcf5998e8ef863108115dcf3691bf7df1",
+      "bytes": 16016,
+      "lines": 290
+    },
+    {
+      "path": ".github/scripts/restore-rehearsal-postgres.sh",
+      "sha256": "7b2e468898d5cae9897dc0337da5ce4e229fe9d980d2961b648a558081fdf5fe",
+      "bytes": 17307,
+      "lines": 412
+    }
+  ]
+}

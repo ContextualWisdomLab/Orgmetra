@@ -1,5 +1,25 @@
 # Operability
 
+## Foundation manifest integrity and uncaptured source
+
+The active-PR manifest contract separates `target_branch: "develop"` (intended integration destination) from `generated_source_branch: null` (generation-source authority was not captured). Null is explicit in every filesystem export, including a named checkout; it is not an archive-only fallback or authenticated branch provenance. The producer never guesses a source from Git, environment variables, PR targets, or caller labels. Validation rejects omitted or non-null source claims, a wrong/missing target, and any legacy `generated_for_branch` field. Matching digest, byte count, line count, and unique normalized path inventory establishes artifact integrity only, not generation-event authority, protection, merge, or release.
+
+After completing all source changes, run `python3 tests/validate_repository.py --print-manifest` against the complete final source and write its actual output to `manifest.json`. Printing is deterministic and read-only; it does not repair the file itself. Never overlay a historical manifest onto newer source. Normal validation remains `npm run validate`; the new offline stdlib manifest regressions are in its existing `tests/workspace-foundation-integration.test.mjs` discovery path, with the unchanged maximum native-child timeout of 15 seconds and fresh temporary manifest roots. They launch no application server, database, network, or credential operation; existing browser/config tests and deadlines remain unchanged.
+
+This is the PR owner's implementation choice under standing user authority, not a new human approval. If an independent review or release contract requires authenticated non-null generation provenance, that remains a separate unmet producer-authority requirement; null and current-checkout observations cannot satisfy it. Independent whole-successor review, normal exact-head CI/security gates, formal approvals, protected integration, host notification, live identity/database evidence, and release obligations remain open.
+
+## Local browser fixture operation
+
+The active-PR Playwright harness refuses existing servers rather than reusing them. Leave unrelated listeners running; if port 4173 is occupied, choose an available port with `ORGMETRA_WORKSPACE_PORT=43127 npm run test:e2e`. The override accepts only canonical decimal TCP ports 1–65535 and must identify a port available to the fixture; an unset override retains 4173. Do not kill a shared service to make a test pass. Keep the configured case deadlines and recording enabled, and verify the owned fixture exits and its listener closes after the run. Local fixture success is not production, hosted-gate, or merge approval.
+
+## Proposed isolated CI routing
+
+The active PR routes the two repository-owned workflows to the proposed `CWL CI isolated` group with `[self-hosted, linux, x64, cwlab-ci-isolated]` labels. The selector matches the central PR #2565 proposal. It does not prove that the group is released, registered, online, or accessible to Orgmetra. Do not substitute a privileged central runner or add the label to an existing shared runner.
+
+Before these jobs execute, the existing infrastructure owners must verify repository access, effective network isolation, clean per-job state, cleanup, and a canary under `linux-cluster-ops#326` and `quarantine-sandbox-runtime#136/#137`. Foundation also requires Python 3.14, Node 24, Docker, host `psql`, Chromium dependencies, and the pinned PostgreSQL 16.14 image. Recovery retains its two pinned PostgreSQL 17.6 services and ports. Managed GitHub Code Quality uses a separate dynamic workflow; its existing settings owner must resolve that routing without creating a local duplicate. Local source checks do not replace executed exact-head jobs, independent approvals, security gates, or protected integration.
+
+Both active-PR workflows provision pinned Node 24 and run the reviewed-lockfile `npm ci` before their first `npm run validate`. Foundation reorders its existing install; Recovery adds the same install and copies Foundation's pinned Python 3.14 setup before its Python provenance consumer. Actual Playwright config-import regressions require the reviewed development dependencies even though the foundation validator itself is dependency-free. Do not rely on inherited or symlinked `node_modules`; local validation is not clean hosted execution or approval.
+
 ## SLO candidates
 
 - HRIS core read availability: 99.9% for production deployments.

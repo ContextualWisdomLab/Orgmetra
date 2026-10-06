@@ -73,9 +73,17 @@ Job evidence
 - `docs/TEST_STRATEGY.md`
 - `docs/OPERABILITY.md`
 - `docs/TRACEABILITY.md`
+- `docs/product-technical-gap-baseline.md`
 - `docs/adr/README.md`
 - `docs/doctoring/REFERENCES.md`
 
 ## Status
 
-Protected `develop` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, normalized worker-bound validity studies, criterion-observation scope, bitemporal workforce-composition evidence, the governed Naruon intent adapter, and requisition review packets. This active PR adds durable purpose-bound People mutation and confirmed-hire materialization paths for Employment, Position, and Assignment with atomic audit/outbox evidence and tenant-scoped idempotency; treat those write paths as active-PR truth until this exact head passes all fresh protected-base gates and merges.
+Active PR #53 includes local People and Job Analysis read views. Editing their
+request fields clears displayed values and invalidates pending responses, even
+if an edit is reverted. Changing the fixture's personal-details purpose also
+clears its prior allowed or denied display; only an explicit review shows a new
+outcome. Node and Chromium regressions cover these display boundaries; they do
+not establish released authentication or deployment.
+
+Observed default `develop` base `eb9757f8649aaad026a9865508d9aad50c1a7a4f` contains the employment-truth kernel (`packages/hris-kernel/src/orgmetra_hris_kernel/employment.py`), bitemporal workforce-composition snapshot source (`packages/hris-kernel/src/orgmetra_hris_kernel/workforce.py`) and regression source (`packages/hris-kernel/tests/test_workforce_composition.py` and `test_workforce_composition_boundaries.py`), People read/mutation/confirmed-hire source (`services/people-api/src/orgmetra_people_api/people.py`, `mutations.py`, and `hire.py`; `database/migrations/0012_people_mutation_idempotency.sql`), and Job Analysis snapshot read/write source (`services/job-analysis-api/src/orgmetra_job_analysis_api/snapshot.py`; `database/migrations/0013_job_analysis_snapshot.sql`). This is repository source presence only, not configured branch-protection enforcement, newly executed tests, deployed behavior, or a release. Active PR #53 UI remains unmerged; the 2026-08-21 inventory and local execution results in `docs/product-technical-gap-baseline.md` are historical, not current all-PR or release evidence.
