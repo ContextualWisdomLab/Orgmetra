@@ -113,6 +113,16 @@ jobs:
         run: node --test tests/recovery-rehearsal.test.mjs
       - name: Validate repository contracts
         run: npm run validate
+      - name: Install PostgreSQL 16 host client
+        run: |
+          sudo apt-get -o DPkg::Lock::Timeout=120 update
+          sudo apt-get -o DPkg::Lock::Timeout=120 install --yes --no-install-recommends postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/psql --version | grep -E '^psql \(PostgreSQL\) 16\.'
+      - name: Prove PostgreSQL 16 host client selection
+        run: |
+          test "$(command -v psql)" = /usr/lib/postgresql/16/bin/psql
+          psql --version | grep -E '^psql \(PostgreSQL\) 16\.'
       - name: Exercise real cross-cluster dump and restore
         env:
           RECOVERY_REHEARSAL_ALLOW_ROLE_DROP: "1"

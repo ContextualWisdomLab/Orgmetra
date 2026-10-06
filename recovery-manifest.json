@@ -4,15 +4,15 @@
   "files": [
     {
       "path": ".github/workflows/recovery-rehearsal-quality.yml",
-      "sha256": "7b5f78c202c9d9ba90c1e6d68ace99885cb354500c32abb107ea6b0e15262217",
-      "bytes": 4747,
-      "lines": 125
+      "sha256": "08abca6f783154a2cd239c131bc174d0908d14dbf3f0d4472cf4557a264ce3b6",
+      "bytes": 5330,
+      "lines": 135
     },
     {
       "path": "docs/traceability/restore-rehearsal.md",
-      "sha256": "1fb9a87ae572cf581f22ab9a7ed0bcf3751b0ff2407cb7f36e1fe60eba3e1786",
-      "bytes": 8486,
-      "lines": 46
+      "sha256": "1ab905d5d8faea270c65ec26e53bf6883a0768f6509c999208b3db68a0c512e3",
+      "bytes": 9652,
+      "lines": 48
     },
     {
       "path": "tests/recovery-rehearsal.test.mjs",

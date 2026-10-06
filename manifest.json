@@ -6,9 +6,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "6c665092776ed9e7baef4b5885ecf20249a298e6ee9b70426e9474af7eddc3a6",
-      "bytes": 7038,
-      "lines": 135
+      "sha256": "b66a63157208934eb459f9d6e103628757de4c51c6d7fd81c3761790b02ea5e6",
+      "bytes": 7621,
+      "lines": 145
     },
     {
       "path": ".gitignore",
@@ -42,9 +42,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "465dbd207157c4ae6f7cbd0769f99688e6cd2a474cebf11b1272f387f403beec",
-      "bytes": 27425,
-      "lines": 108
+      "sha256": "0e0317bcaa066d6eeb2ff2c5169ae1e0d04d48e581dbf0f95bcac701d92fea59",
+      "bytes": 28871,
+      "lines": 110
     },
     {
       "path": "CLAUDE.md",
@@ -510,9 +510,9 @@
     },
     {
       "path": "tests/test_github_actions_runner_image.py",
-      "sha256": "a0ea3c514da21bfd35c98c53fa958c5decef4fa624873f6b93757bd736c03947",
-      "bytes": 10036,
-      "lines": 232
+      "sha256": "f0962acafa377c7198c4e1228428bd4b8294e1af3f518871c1cb16420b8afe81",
+      "bytes": 20874,
+      "lines": 439
     },
     {
       "path": "tests/test_job_analysis_snapshot_postgres.sh",
