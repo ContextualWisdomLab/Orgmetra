@@ -42,8 +42,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0e0317bcaa066d6eeb2ff2c5169ae1e0d04d48e581dbf0f95bcac701d92fea59",
-      "bytes": 28871,
+      "sha256": "6190bd413b65843438dc30b171adb0a0235de4dfdab0e56d16b9c0b3c4155013",
+      "bytes": 29013,
       "lines": 110
     },
     {
@@ -348,8 +348,8 @@
     },
     {
       "path": "docs/adr/0026-product-technical-gap-baseline.md",
-      "sha256": "6d3f463e1601b0a6d5c9f404a8f866aa5ec7ea30b512b2c5251dfb5c3f42b3b4",
-      "bytes": 3133,
+      "sha256": "222fb4e961b453fe9b8e1c931b83e5d8a24ff1d0881d85d17e9ef891ed92fe31",
+      "bytes": 3266,
       "lines": 32
     },
     {

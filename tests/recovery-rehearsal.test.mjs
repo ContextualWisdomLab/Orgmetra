@@ -70,7 +70,7 @@ function recordRehearsalEnvironment(workflow, services, consume) {
     const match = /^ {10}([A-Z_]+): (.+)$/.exec(line);
     assert.ok(match, 'require the existing literal rehearsal env mapping');
     assert.equal(Object.hasOwn(environment, match[1]), false, `duplicate ${match[1]}`);
-    const value = match[2].replace(/\$\{\{\s*job\.services\.(source_postgres|restore_postgres)\.(ports\[5432\]|id)\s*\}\}/g,
+    const value = match[2].replace(/\$\{\{\s*job\.services\.(source_postgres|restore_postgres)\.(ports\['5432'\]|id)\s*\}\}/g,
       (_, service, field) => {
         const resolved = field === 'id' ? services[service]?.id : services[service]?.ports?.[5432];
         assert.notEqual(resolved, undefined, `missing ${service}.${field}`);
@@ -128,14 +128,14 @@ test('recovery port contract rejects either fixed host mapping', () => {
 test('recovery port binding rejects swapped, shared, wrong and absent references', () => {
   const workflow = readFileSync(workflowPath, 'utf8');
   requireRehearsalPortBinding(workflow);
-  const source = '${{ job.services.source_postgres.ports[5432] }}';
-  const restore = '${{ job.services.restore_postgres.ports[5432] }}';
+  const source = "${{ job.services.source_postgres.ports['5432'] }}";
+  const restore = "${{ job.services.restore_postgres.ports['5432'] }}";
   const mutants = [
     workflow.replace(source, '__source_slot__').replace(restore, source).replace('__source_slot__', restore),
     workflow.replace(restore, source),
     workflow.replace(source, restore),
-    workflow.replace(source, '${{ job.services.source_postgres.ports[5433] }}'),
-    workflow.replace(restore, '${{ job.services.restore_postgres.ports[5433] }}'),
+    workflow.replace(source, "${{ job.services.source_postgres.ports['5433'] }}"),
+    workflow.replace(restore, "${{ job.services.restore_postgres.ports['5433'] }}"),
     workflow.replace(source, ''),
     workflow.replace(restore, ''),
     workflow.replace(/^ {10}POSTGRES_SOURCE_ADMIN_URL:.*\n/m, ''),
@@ -161,7 +161,7 @@ test('recovery environment refuses missing allocated ports before consumer entry
     delete missing[service].ports[5432];
     calls = 0;
     assert.throws(() => recordRehearsalEnvironment(workflow, missing, () => { calls += 1; }),
-      { code: 'ERR_ASSERTION', message: `missing ${service}.ports[5432]` });
+      { code: 'ERR_ASSERTION', message: `missing ${service}.ports['5432']` });
     assert.equal(calls, 0);
   }
 });

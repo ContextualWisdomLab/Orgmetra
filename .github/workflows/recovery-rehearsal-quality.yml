@@ -126,8 +126,8 @@ jobs:
       - name: Exercise real cross-cluster dump and restore
         env:
           RECOVERY_REHEARSAL_ALLOW_ROLE_DROP: "1"
-          POSTGRES_SOURCE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:${{ job.services.source_postgres.ports[5432] }}/postgres
-          POSTGRES_RESTORE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:${{ job.services.restore_postgres.ports[5432] }}/postgres
+          POSTGRES_SOURCE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:${{ job.services.source_postgres.ports['5432'] }}/postgres
+          POSTGRES_RESTORE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:${{ job.services.restore_postgres.ports['5432'] }}/postgres
           POSTGRES_SOURCE_CONTAINER: ${{ job.services.source_postgres.id }}
           POSTGRES_RESTORE_CONTAINER: ${{ job.services.restore_postgres.id }}
         run: bash .github/scripts/restore-rehearsal-postgres.sh
