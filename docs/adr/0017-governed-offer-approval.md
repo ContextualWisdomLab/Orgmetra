@@ -1,12 +1,13 @@
 # ADR 0017: Governed offer approval evidence
 
-- Status: Proposed — active PR only
+- Status: Accepted
+- Provenance: source present on observed `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f`; configured protection remains a separate gap (#89).
 - Date: 2026-08-19
 - Scope: Talent Acquisition offer review
 
 ## Context
 
-Protected `develop` can govern candidate, requisition, selection, and employment evidence, but it does not yet expose a bounded pre-send contract proving that a proposed offer is tied to the selected candidate, authoritative Job/optional Position, reviewed selection decision, compensation-package provenance, offer-terms provenance, and accountable human approval.
+The observed `develop` source contains candidate, requisition, selection, and employment evidence boundaries and the bounded pre-send offer-approval contract. Its source checks bind a proposed offer packet to candidate, Job/optional Position, selection-decision, compensation-package, offer-terms, and human-review references. Repository presence does not prove authoritative reference resolution, actual approval, configured branch protection, deployed behavior, or release.
 
 Offer review is high-impact employment workflow. A governance envelope must not become an alternate decision authority, a salary-value cache, or a channel that lets generated/model material masquerade as an approved offer. Different opaque requester/approver references also do not prove that the authoritative actor boundary resolves them to different people, and UUID syntax does not prove that the referenced candidate, requisition, Job/Position, selection decision, compensation package, or offer terms belong to the packet tenant. Packet-owned UUIDv1 references also carry timestamp/node-derived correlation metadata. The authoritative tenant identifier is different: it is issued by Orgmetra core, so this leaf package must accept the canonical non-sentinel operational UUID contract owned by that boundary rather than silently imposing a second version policy.
 
@@ -30,7 +31,7 @@ Canonical JSON and SHA-256 are audit-correlation evidence only. The packet does 
 
 A buyer can review one deterministic, PII-minimized envelope before an offer moves to the authoritative offer workflow. Compensation values stay in their purpose-bound owner boundary, while Orgmetra keeps exact provenance references, evidence version, and human accountability. Packet-owned UUIDv1/non-v4 references fail closed before serialization without making this leaf package incompatible with authoritative Orgmetra tenant UUIDs. Cross-tenant evidence mixing is fail-closed at the host approval boundary because every packet reference must resolve in the exact tenant. Requester/approver separation is proven only after tenant-scoped authoritative actor resolution. New offer-review reason categories require an explicit contract change and regression evidence rather than accepting arbitrary caller text.
 
-Downstream offer persistence/execution must independently enforce authorization, tenant-scoped source-evidence resolution, idempotency where applicable, and immutable audit/outbox evidence. This ADR remains proposed active-PR truth until integrated into protected `develop`.
+Downstream offer persistence/execution must independently enforce authorization, tenant-scoped source-evidence resolution, idempotency where applicable, and immutable audit/outbox evidence. The packet contract source is present on the observed `develop` base; configured branch protection, authoritative host integration, connected buyer workflow, and release evidence remain separate work.
 
 ## References
 

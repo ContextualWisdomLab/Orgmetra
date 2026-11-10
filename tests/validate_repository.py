@@ -23,7 +23,16 @@ REQUIRED = [
     "NOTICE",
     "manifest.json",
     "package.json",
+    "package-lock.json",
+    ".storybook/main.js",
+    ".storybook/preview.js",
+    "apps/hr-workspace/index.html",
+    "apps/hr-workspace/styles.css",
+    "apps/hr-workspace/app.js",
+    "apps/hr-workspace/workspace.stories.js",
     ".github/workflows/foundation-ci.yml",
+    "playwright.config.mjs",
+    "tests/workspace-foundation-integration.test.mjs",
     "docs/PRD.md",
     "docs/TRD.md",
     "docs/USER_STORIES.md",
@@ -39,6 +48,7 @@ REQUIRED = [
     "docs/TEST_STRATEGY.md",
     "docs/OPERABILITY.md",
     "docs/TRACEABILITY.md",
+    "docs/product-technical-gap-baseline.md",
     "docs/adr/README.md",
     "docs/adr/0001-orgmetra-authoritative-hris-record.md",
     "docs/adr/0002-federated-cwl-integration-boundaries.md",
@@ -54,6 +64,7 @@ REQUIRED = [
     "docs/adr/0012-governed-migration-handoff.md",
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
+    "docs/adr/0026-product-technical-gap-baseline.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -77,6 +88,11 @@ REQUIRED = [
     "scripts/foundation-contract.mjs",
     "tests/dispatcher-inventory.test.mjs",
     "tests/foundation-contract.test.mjs",
+    "tests/hr-workspace.test.mjs",
+    "tests/job-analysis-api-fixture.mjs",
+    "tests/test_github_actions_runner_image.py",
+    "tests/e2e/hr-workspace-core-model.spec.mjs",
+    "tests/e2e/hr-workspace.spec.mjs",
     "tests/openapi-contract.test.mjs",
     "tests/test_bitemporal_postgres.sh",
     "tests/test_tenant_isolation_postgres.sh",
@@ -120,7 +136,7 @@ def _line_count(data: bytes) -> int:
 
 
 def _expected_manifest_document() -> dict[str, Any]:
-    """Build deterministic provenance for the exact active branch artifact set."""
+    """Build deterministic artifact integrity for the target; source is not captured."""
     files = []
     for relative_path in sorted(set(REQUIRED) - {"manifest.json"}):
         path = ROOT / relative_path
@@ -138,7 +154,8 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "feat/audit-outbox-envelope",
+        "target_branch": "develop",
+        "generated_source_branch": None,
         "files": files,
     }
 
@@ -152,10 +169,14 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
-    if manifest.get("generated_for_branch") != "feat/audit-outbox-envelope":
+    if manifest.get("target_branch") != "develop":
+        _fail("manifest target_branch must identify the intended integration target develop")
+    if "generated_for_branch" in manifest:
+        _fail("manifest generated_for_branch is obsolete; use target_branch")
+    if "generated_source_branch" not in manifest or manifest["generated_source_branch"] is not None:
         _fail(
-            "manifest generated_for_branch must identify the active generation branch "
-            "feat/audit-outbox-envelope"
+            "manifest generated_source_branch must be null; "
+            "this deterministic producer does not capture generation-source authority"
         )
 
     entries: dict[str, dict[str, Any]] = {}
@@ -596,6 +617,8 @@ def _validate_openapi_contract() -> None:
 def _validate_markdown() -> None:
     """Reject explicit unfinished-work markers with exact path/line and malformed fences."""
     for path in ROOT.rglob("*.md"):
+        if {"node_modules", "storybook-static"}.intersection(path.parts):
+            continue
         text = path.read_text(encoding="utf-8")
         for line_number, line in enumerate(text.splitlines(), start=1):
             if UNFINISHED_MARKER_LINE_PATTERN.fullmatch(line):

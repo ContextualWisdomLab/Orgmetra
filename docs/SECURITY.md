@@ -39,6 +39,38 @@ Evaluation fails closed unless request, actor, resource, and policy tenants all 
 
 Authorization evidence contains only governance metadata, including the opaque actor and exact target-resource references, plus field names, never protected values. A denial returns a stable reason code and next safe action. An allow decision returns only the exact requested field subset, not every field the policy could permit. Both allow and denial evidence preserve the exact target reference so immutable audit correlation cannot collapse distinct person or employment records into one resource-kind-level event. These rules implement the Orgmetra side of the NIST SP 800-162 ABAC shape and attribute-integrity principles from NIST SP 800-205; ADR 0008 records the boundary.
 
+## Active-PR workspace display boundary
+
+People and Job Analysis read forms invalidate their pending response generation
+and clear displayed protected values on input or change events. An edit followed
+by a revert does not revive the old response. This local display fence neither
+cancels the request already sent nor replaces authoritative API authorization.
+A fresh explicit read still uses the existing host-provided credential and
+cookie-free transport. Synthetic Node and Chromium regressions are local
+boundary evidence, not released authentication or deployment acceptance.
+For retained documents, a payload-free `orgmetra:authority-invalidated` document
+event synchronously clears both read displays and advances both response fences.
+The embedding host must emit it before exposing the document to a changed
+account, tenant, or effective authority, including sign-out and revocation.
+It grants no access and does not infer identity from credentials or form inputs.
+Host notification timing, coherent provider/coordinates, and release integration
+remain separate requirements; otherwise the host must destroy the document.
+The workspace submit handlers also pass their existing generation check to the
+read helpers. After credential acquisition and before invoking fetch, an obsolete
+submission is rejected and settles quietly through the existing version-fenced
+catch; it cannot dispatch or clear a newer read. Input/change, edit-and-revert,
+authority notification (including repeated or away-and-back notification), and a
+newer submit invalidate credential-waiting submissions. The exported helpers
+retain their two-argument behavior: a direct caller without a generation guard
+has no such dispatch protection. Already-dispatched transport is not cancelled;
+its response and body outcomes retain the existing display fences. This local
+Node seam does not establish host notification timing, actual issuer revocation,
+identity integration, hosted CI, independent approval, or protected release.
+The fixture's personal-details purpose selector also clears both prior allowed
+and denied display states on input or change. Changing or restoring a purpose
+never grants access or performs a new review. This fixture display rule does not
+claim authoritative authorization, audit persistence, or a protected-value read.
+
 ## Mutation security contract
 
 Every mutating HTTP operation and its server-side command handler requires one validated `Idempotency-Key` that crosses the command boundary into durable transactional replay state. The published OpenAPI employment, position, assignment, person, job-profile, and selection-decision command families require `X-Tenant-Reference`, `X-Actor-Reference`, and `X-Purpose-Code`; those values must match the authenticated Keyverse principal and the operation-specific least-privilege scope. The executable People mutation handlers added on this branch currently implement employment, position, and assignment creation with those headers. Person, job-profile, and selection-decision remain published foundation API contracts until their server handlers are integrated; their OpenAPI presence is not runtime evidence. Confirmed-hire materialization instead binds the tenant in `/v1/tenants/{tenant_record_id}/candidate-worker-conversions`, the business purpose in its exact query parameter, and the actor through the authenticated principal. It does not accept weaker duplicate actor/tenant/purpose header authorities.

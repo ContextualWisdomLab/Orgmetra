@@ -19,6 +19,9 @@ node_modules/
 dist/
 coverage/
 .turbo/
+storybook-static/
+playwright-report/
+test-results/
 
 # Rust
 /target/
@@ -35,3 +38,4 @@ secrets/
 artifacts/
 reports/
 *.log
+/.codegraph/

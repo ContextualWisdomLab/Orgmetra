@@ -20,7 +20,16 @@ export const REQUIRED_FILES = Object.freeze([
   'NOTICE',
   'manifest.json',
   'package.json',
+  'package-lock.json',
+  '.storybook/main.js',
+  '.storybook/preview.js',
+  'apps/hr-workspace/index.html',
+  'apps/hr-workspace/styles.css',
+  'apps/hr-workspace/app.js',
+  'apps/hr-workspace/workspace.stories.js',
   '.github/workflows/foundation-ci.yml',
+  'playwright.config.mjs',
+  'tests/workspace-foundation-integration.test.mjs',
   'docs/PRD.md',
   'docs/TRD.md',
   'docs/USER_STORIES.md',
@@ -36,6 +45,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/TEST_STRATEGY.md',
   'docs/OPERABILITY.md',
   'docs/TRACEABILITY.md',
+  'docs/product-technical-gap-baseline.md',
   'docs/adr/README.md',
   'docs/adr/0001-orgmetra-authoritative-hris-record.md',
   'docs/adr/0002-federated-cwl-integration-boundaries.md',
@@ -51,6 +61,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0012-governed-migration-handoff.md',
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
+  'docs/adr/0026-product-technical-gap-baseline.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -74,6 +85,11 @@ export const REQUIRED_FILES = Object.freeze([
   'scripts/foundation-contract.mjs',
   'tests/dispatcher-inventory.test.mjs',
   'tests/foundation-contract.test.mjs',
+  'tests/hr-workspace.test.mjs',
+  'tests/job-analysis-api-fixture.mjs',
+  'tests/test_github_actions_runner_image.py',
+  'tests/e2e/hr-workspace-core-model.spec.mjs',
+  'tests/e2e/hr-workspace.spec.mjs',
   'tests/openapi-contract.test.mjs',
   'tests/test_bitemporal_postgres.sh',
   'tests/test_tenant_isolation_postgres.sh',
@@ -93,7 +109,7 @@ export const REQUIRED_FILES = Object.freeze([
 
 /** Exact maturity vocabulary accepted by traceability tables. */
 export const MATURITY_VALUES = Object.freeze(new Set([
-  'implemented_on_protected_main',
+  'implemented_on_protected_develop',
   'implemented_on_active_pr',
   'accepted_architecture',
   'planned',
@@ -197,6 +213,7 @@ export function validateDatabaseObjectNames(objectNames = DATABASE_OBJECT_NAMES)
     .map((objectName) => `Invalid database object name: ${objectName}`);
 }
 
+/** Preserve line endings and replace every other non-code SQL character with a space. */
 function maskedSqlCharacter(character) {
   return character === '\n' || character === '\r' ? character : ' ';
 }
@@ -215,6 +232,7 @@ export function maskPostgresNonCode(sqlText) {
   let output = '';
   let index = 0;
 
+  /** Mask characters up to the exclusive end offset while advancing the enclosing SQL cursor. */
   const maskThrough = (endIndex) => {
     while (index < endIndex) {
       output += maskedSqlCharacter(sqlText[index]);
@@ -401,10 +419,12 @@ export function validateAdrIndex(rootPath) {
   return errors;
 }
 
+/** Count leading whitespace characters; this helper does not expand tabs into display columns. */
 function indentationWidth(line) {
   return line.length - line.trimStart().length;
 }
 
+/** Return lines nested beneath one exact marker in the supported indentation-stable YAML subset. */
 function extractYamlBlock(yamlText, exactMarker) {
   const lines = yamlText.split(/\r?\n/);
   const startIndex = lines.findIndex((line) => line === exactMarker);
@@ -419,6 +439,7 @@ function extractYamlBlock(yamlText, exactMarker) {
   return blockLines.join('\n');
 }
 
+/** Append a labeled validation error when a required literal is absent from its selected block. */
 function requireWithin(errors, label, blockText, fragment, description) {
   if (!blockText.includes(fragment)) {
     errors.push(`${label}: missing ${description}`);

@@ -15,6 +15,7 @@ const provenanceFiles = Object.freeze([
   rehearsalPath
 ]);
 
+/** Count UTF-8 lines without treating a final newline as an extra empty line. */
 function lineCount(buffer) {
   const parts = buffer.toString('utf8').split(/\r?\n/);
   if (parts.at(-1) === '') {
@@ -23,6 +24,7 @@ function lineCount(buffer) {
   return parts.length;
 }
 
+/** Require the exact recovery file set and verify each retained hash, byte count, and line count. */
 function verifyRecoveryProvenance() {
   assert.equal(existsSync(provenancePath), true, `${provenancePath} must exist`);
   const manifest = JSON.parse(readFileSync(provenancePath, 'utf8'));
@@ -37,9 +39,174 @@ function verifyRecoveryProvenance() {
   }
 }
 
+/** Assert that the supplied source text matches the required contract pattern. */
 function requirePattern(text, pattern, message) {
   assert.match(text, pattern, message);
 }
+
+// Parse only the workflow's existing block-mapping grammar; reject absent or
+// duplicate keys instead of matching unrelated text elsewhere in the document.
+/** Extract one uniquely named nested workflow block using only the fixture's supported indentation grammar. */
+function workflowBlock(text, header, indent) {
+  const lines = text.split(/\r?\n/);
+  const starts = lines.flatMap((line, index) => line === `${' '.repeat(indent)}${header}` ? [index] : []);
+  assert.equal(starts.length, 1, `require one ${header} block`);
+  const start = starts[0] + 1;
+  let end = start;
+  while (end < lines.length && (lines[end].trim() === '' || lines[end].search(/\S/) > indent)) end += 1;
+  return lines.slice(start, end).join('\n');
+}
+
+/** Require both PostgreSQL services to declare container port 5432 without a fixed host port. */
+function requireRandomServicePorts(workflow) {
+  const services = workflowBlock(workflow, 'services:', 4);
+  for (const service of ['source_postgres', 'restore_postgres']) {
+    const body = workflowBlock(services, `${service}:`, 6);
+    const ports = workflowBlock(body, 'ports:', 8);
+    assert.equal(ports.trim(), '- 5432', `${service} must expose only container port 5432 with a random host port`);
+  }
+}
+
+/** Record the actual rehearsal step mapping with synthetic service values; never execute its command. */
+function recordRehearsalEnvironment(workflow, services, consume) {
+  const body = workflowBlock(workflow, '- name: Exercise real cross-cluster dump and restore', 6);
+  const envBlock = workflowBlock(body, 'env:', 8);
+  const environment = {};
+  for (const line of envBlock.split('\n')) {
+    const match = /^ {10}([A-Z_]+): (.+)$/.exec(line);
+    assert.ok(match, 'require the existing literal rehearsal env mapping');
+    assert.equal(Object.hasOwn(environment, match[1]), false, `duplicate ${match[1]}`);
+    const value = match[2].replace(/\$\{\{\s*job\.services\.(source_postgres|restore_postgres)\.(ports\['5432'\]|id)\s*\}\}/g,
+      (_, service, field) => {
+        const resolved = field === 'id' ? services[service]?.id : services[service]?.ports?.[5432];
+        assert.notEqual(resolved, undefined, `missing ${service}.${field}`);
+        return String(resolved);
+      });
+    assert.doesNotMatch(value, /\$\{\{/, 'unsupported service expression');
+    environment[match[1]] = value.replace(/^"(.*)"$/, '$1');
+  }
+  const run = /^ {8}run: (.+)$/m.exec(body);
+  assert.ok(run, 'require the actual rehearsal command');
+  // This callback records the real step mapping; it never executes Bash, Docker
+  // or PostgreSQL and does not model the GitHub runner's expression engine.
+  consume(environment, run[1]);
+}
+
+/** Assert that the recorded rehearsal command receives distinct synthetic source and restore ports. */
+function requireRehearsalPortBinding(workflow) {
+  const services = {
+    source_postgres: { id: 'synthetic-source', ports: { 5432: 49171 } },
+    restore_postgres: { id: 'synthetic-restore', ports: { 5432: 49283 } }
+  };
+  const records = [];
+  recordRehearsalEnvironment(workflow, services, (environment, command) => records.push({ environment, command }));
+  assert.equal(records.length, 1);
+  assert.deepEqual(records[0], {
+    environment: {
+      RECOVERY_REHEARSAL_ALLOW_ROLE_DROP: '1',
+      POSTGRES_SOURCE_ADMIN_URL: 'postgresql://orgmetra:orgmetra@localhost:49171/postgres',
+      POSTGRES_RESTORE_ADMIN_URL: 'postgresql://orgmetra:orgmetra@localhost:49283/postgres',
+      POSTGRES_SOURCE_CONTAINER: 'synthetic-source',
+      POSTGRES_RESTORE_CONTAINER: 'synthetic-restore'
+    },
+    command: 'bash .github/scripts/restore-rehearsal-postgres.sh'
+  });
+}
+
+test('recovery services expose container 5432 with random host ports', () => {
+  requireRandomServicePorts(readFileSync(workflowPath, 'utf8'));
+});
+
+test('recovery step consumes each distinct allocated service port', () => {
+  requireRehearsalPortBinding(readFileSync(workflowPath, 'utf8'));
+});
+
+test('recovery port contract rejects either fixed host mapping', () => {
+  const workflow = readFileSync(workflowPath, 'utf8');
+  requireRandomServicePorts(workflow);
+  for (const [service, mapping] of [['source_postgres', '5432:5432'], ['restore_postgres', '5433:5432']]) {
+    const header = `      ${service}:\n`;
+    const start = workflow.indexOf(header);
+    assert.notEqual(start, -1, `require ${service} header`);
+    assert.equal(workflow.indexOf(header, start + header.length), -1, `require unique ${service} header`);
+    const body = workflowBlock(workflowBlock(workflow, 'services:', 4), `${service}:`, 6);
+    const ports = workflowBlock(body, 'ports:', 8);
+    assert.equal(ports.trim(), '- 5432');
+    const mutant = workflow.slice(0, start) + workflow.slice(start).replace('- 5432', `- ${mapping}`);
+    const services = workflowBlock(mutant, 'services:', 4);
+    assert.equal(workflowBlock(workflowBlock(services, `${service}:`, 6), 'ports:', 8).trim(), `- ${mapping}`);
+    const sibling = service === 'source_postgres' ? 'restore_postgres' : 'source_postgres';
+    assert.equal(workflowBlock(services, `${sibling}:`, 6), workflowBlock(workflowBlock(workflow, 'services:', 4), `${sibling}:`, 6));
+    assert.notEqual(mutant, workflow);
+    assert.throws(() => requireRandomServicePorts(mutant), { code: 'ERR_ASSERTION', message: new RegExp(service) });
+  }
+});
+
+test('recovery port binding rejects swapped, shared, wrong and absent references', () => {
+  const workflow = readFileSync(workflowPath, 'utf8');
+  requireRehearsalPortBinding(workflow);
+  const source = "${{ job.services.source_postgres.ports['5432'] }}";
+  const restore = "${{ job.services.restore_postgres.ports['5432'] }}";
+  const mutants = [
+    workflow.replace(source, '__source_slot__').replace(restore, source).replace('__source_slot__', restore),
+    workflow.replace(restore, source),
+    workflow.replace(source, restore),
+    workflow.replace(source, "${{ job.services.source_postgres.ports['5433'] }}"),
+    workflow.replace(restore, "${{ job.services.restore_postgres.ports['5433'] }}"),
+    workflow.replace(source, ''),
+    workflow.replace(restore, ''),
+    workflow.replace(/^ {10}POSTGRES_SOURCE_ADMIN_URL:.*\n/m, ''),
+    workflow.replace(/^ {10}POSTGRES_RESTORE_ADMIN_URL:.*\n/m, '')
+  ];
+  for (const mutant of mutants) {
+    assert.notEqual(mutant, workflow);
+    assert.throws(() => requireRehearsalPortBinding(mutant), { code: 'ERR_ASSERTION' });
+  }
+});
+
+test('recovery environment refuses missing allocated ports before consumer entry', () => {
+  const workflow = readFileSync(workflowPath, 'utf8');
+  const services = {
+    source_postgres: { id: 'synthetic-source', ports: { 5432: 49171 } },
+    restore_postgres: { id: 'synthetic-restore', ports: { 5432: 49283 } }
+  };
+  let calls = 0;
+  recordRehearsalEnvironment(workflow, services, () => { calls += 1; });
+  assert.equal(calls, 1);
+  for (const service of ['source_postgres', 'restore_postgres']) {
+    const missing = structuredClone(services);
+    delete missing[service].ports[5432];
+    calls = 0;
+    assert.throws(() => recordRehearsalEnvironment(workflow, missing, () => { calls += 1; }),
+      { code: 'ERR_ASSERTION', message: `missing ${service}.ports['5432']` });
+    assert.equal(calls, 0);
+  }
+});
+
+/** Check source provenance without turning backup requirements into operational proof. */
+function requireRecoverySourceProvenance(text) {
+  const scope = /## Scope and truth status\r?\n([\s\S]*?)(?=\r?\n## |$)/.exec(text);
+  assert.ok(scope, 'the recovery scope section must exist');
+  assert.doesNotMatch(scope[1], /protected-main|Protected-main truth|develop` currently requires/,
+    'recovery scope must not assert current protected provenance');
+  assert.match(scope[1], /develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f/);
+  assert.match(scope[1], /normative requirements/);
+  assert.match(scope[1], /Configured protection, hosted execution, and deployed recovery controls remain unverified/);
+  assert.match(scope[1], /observed-base migration sources/);
+}
+
+test('restore scope separates immutable source requirements from current protection', () => {
+  const text = readFileSync(traceabilityPath, 'utf8');
+  requireRecoverySourceProvenance(text);
+  for (const phrase of ['Protected-main truth: ', 'the protected-main migration sequence']) {
+    const marker = '## Scope and truth status\n';
+    assert.ok(text.includes(marker));
+    const contradicted = text.replace(marker, `${marker}\n${phrase}\n`);
+    assert.throws(() => requireRecoverySourceProvenance(contradicted), {
+      code: 'ERR_ASSERTION', message: 'recovery scope must not assert current protected provenance'
+    });
+  }
+});
 
 test('restore rehearsal is executable exact-head recovery evidence', () => {
   for (const requiredPath of [workflowPath, rehearsalPath, traceabilityPath]) {
@@ -98,7 +265,7 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     requirePattern(rehearsal, pattern, message);
   }
 
-  assert.ok(traceability.includes('Protected-main truth'), 'traceability must distinguish protected-main truth');
+  requireRecoverySourceProvenance(traceability);
   assert.ok(traceability.includes('exact restored database'), 'traceability must bind evidence to the restored database');
   assert.ok(traceability.includes('No certification claim'), 'traceability must avoid unsupported certification claims');
   verifyRecoveryProvenance();

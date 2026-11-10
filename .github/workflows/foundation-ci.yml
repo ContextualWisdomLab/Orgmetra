@@ -19,7 +19,9 @@ concurrency:
 jobs:
   quality:
     name: Repository quality
-    runs-on: ubuntu-24.04
+    runs-on:
+      group: CWL CI isolated
+      labels: [self-hosted, linux, x64, cwlab-ci-isolated]
     timeout-minutes: 60
     env:
       ORGMETRA_POSTGRES_IMAGE: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
@@ -46,10 +48,18 @@ jobs:
       - name: Compile owned Python boundaries
         run: >-
           python -m compileall -q tests packages services
-      - name: Prove explicit GitHub-hosted runner image contract
+      - name: Prove proposed isolated self-hosted runner contract
         run: python -m unittest tests.test_github_actions_runner_image
+      - name: Install Node dependencies
+        run: npm ci
       - name: Validate foundation pack
         run: npm run validate
+      - name: Build Storybook
+        run: npm run build-storybook
+      - name: Install Chromium and Linux dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Run HR workspace browser E2E
+        run: npm run test:e2e
       - name: Prove Foundation CI dependency hygiene
         run: bash tests/test_foundation_ci_dependency_hygiene.sh
       - name: Install reviewed test toolchain
@@ -68,6 +78,16 @@ jobs:
           PYTHONPATH=packages/selection-review/src COVERAGE_FILE=/tmp/orgmetra-selection-review.coverage python -m pytest -c packages/selection-review/pyproject.toml packages/selection-review/tests
           PYTHONPATH=services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-job-analysis-api.coverage python -m pytest -c services/job-analysis-api/pyproject.toml services/job-analysis-api/tests
           PYTHONPATH=services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-people-api.coverage python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
+      - name: Install PostgreSQL 16 host client
+        run: |
+          sudo apt-get -o DPkg::Lock::Timeout=120 update
+          sudo apt-get -o DPkg::Lock::Timeout=120 install --yes --no-install-recommends postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/psql --version | grep -E '^psql \(PostgreSQL\) 16\.'
+      - name: Prove PostgreSQL 16 host client selection
+        run: |
+          test "$(command -v psql)" = /usr/lib/postgresql/16/bin/psql
+          psql --version | grep -E '^psql \(PostgreSQL\) 16\.'
       - name: Run PostgreSQL contracts in isolated containers
         env:
           PGPASSWORD: orgmetra

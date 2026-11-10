@@ -1,6 +1,6 @@
 # ADR 0014: Persist governed job-analysis snapshots
 
-- Status: Accepted on active implementation branch
+- Status: Accepted
 - Date: 2026-08-20
 - Owners: Orgmetra Job Analysis / Workforce Validation
 
