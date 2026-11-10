@@ -42,9 +42,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "822e15b352d2c18db33873fd09093c57fdcdac91eea5c7ee17c18e422a26c3c1",
-      "bytes": 29794,
-      "lines": 117
+      "sha256": "f0ffa98c06e262f5b89c0a3f10642b9cb8b23bbab54261ae3630b8a58a4164c6",
+      "bytes": 30020,
+      "lines": 118
     },
     {
       "path": "CLAUDE.md",
@@ -72,14 +72,14 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "702a16e2d0ededb507ecf83e76877aa13118677e99ec13a35cef6941f9c50a90",
-      "bytes": 34488,
+      "sha256": "90c0795c083095882e75d8def3a1ec6c54b784899702f4784acc3cdbe3d413c1",
+      "bytes": 34571,
       "lines": 516
     },
     {
       "path": "apps/hr-workspace/index.html",
-      "sha256": "b210eba4162cdbb3493bbf5ed4b9f5f502d06a6cd22fb97f7d432ca80b23c59f",
-      "bytes": 19902,
+      "sha256": "593d31b2c2fa76ccd1e3a57627fffbf9652e1d87bcee64e188cd418eb8b34d20",
+      "bytes": 19912,
       "lines": 159
     },
     {
@@ -438,9 +438,9 @@
     },
     {
       "path": "tests/e2e/hr-workspace-core-model.spec.mjs",
-      "sha256": "b4a328a7756723b0dbdca44d1b6bd2f3240c72751dc1b5f793d4b658c63da329",
-      "bytes": 1319,
-      "lines": 27
+      "sha256": "2d46845e9e437e4ada2f469162a3c63b6e60a7481e3c6b472b6a393fd6dbe51d",
+      "bytes": 2120,
+      "lines": 42
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",

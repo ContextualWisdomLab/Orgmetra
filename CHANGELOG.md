@@ -8,6 +8,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Explain named workspace, story, foundation-validator, and regression-fixture helpers without changing their executable behavior. This documentation-only repair does not assert external review coverage or release acceptance.
 
 ### Fixed
+- Localize the Employee Profile Job label and role-definition description in English and Korean. Browser regression coverage verifies both languages and a return to English while preserving the stable `job_record` identifier.
 - Validate protected-read coordinates before requesting host credentials and distinguish local input errors in both workspace languages. Correct the home anchor and improve sidebar-focus and form-control border contrast.
 - Align schema, ADR, runner prerequisites, and historical gap-baseline traceability documentation with their actual source scope.
 

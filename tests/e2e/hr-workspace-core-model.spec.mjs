@@ -20,8 +20,23 @@ test('employee profile keeps Job, Position, and Assignment as distinct HRIS conc
   await expect(positionCard.locator('strong')).toHaveText('position_record');
   await expect(assignmentCard.locator('strong')).toHaveText('assignment_record');
 
+  await expect(jobCard.locator('span')).toHaveText('Job');
+  await expect(jobCard.locator('small')).toHaveText('Role definition');
+  await expect(jobCard).not.toContainText('직무');
+  await expect(jobCard).not.toContainText('역할 정의');
+
   await page.locator('#locale-toggle').click();
-  await expect(jobCard).toContainText('직무');
+  await expect(jobCard.locator('span')).toHaveText('직무');
+  await expect(jobCard.locator('small')).toHaveText('역할 정의');
+  await expect(jobCard).not.toContainText('Job');
+  await expect(jobCard).not.toContainText('Role definition');
   await expect(positionCard).toContainText('직위');
   await expect(assignmentCard).toContainText('배정');
+
+  await page.locator('#locale-toggle').click();
+  await expect(jobCard.locator('span')).toHaveText('Job');
+  await expect(jobCard.locator('small')).toHaveText('Role definition');
+  await expect(jobCard).not.toContainText('직무');
+  await expect(jobCard).not.toContainText('역할 정의');
+  await expect(jobCard.locator('strong')).toHaveText('job_record');
 });
