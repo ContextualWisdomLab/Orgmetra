@@ -42,9 +42,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2d8aa6e3dbf92cb65b63b3cac105080800333d23e3af24ce7fdac070c8c95d24",
-      "bytes": 30574,
-      "lines": 120
+      "sha256": "29aa0dab9f0b66ada8471f6ee6870bd171a4811672528c02004bcb4351c96e71",
+      "bytes": 30823,
+      "lines": 121
     },
     {
       "path": "CLAUDE.md",
@@ -306,9 +306,9 @@
     },
     {
       "path": "docs/adr/0008-purpose-bound-pii-authorization.md",
-      "sha256": "c5157d3bc58f3d8d29e03104dd15eb2911cc1bb66e2c92a935b26d7164648dc7",
-      "bytes": 5988,
-      "lines": 55
+      "sha256": "01147cc28f54a38c2a203f6c043f46d5a2aa5deb72b41a4a7f0bb5b86ded65c0",
+      "bytes": 6104,
+      "lines": 56
     },
     {
       "path": "docs/adr/0009-performance-criterion-observation-scope.md",
@@ -450,9 +450,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "7f5509bf938ae9b0ed56eb4da75149c4f5b088389eba2a1fc31567d6db413301",
-      "bytes": 29655,
-      "lines": 616
+      "sha256": "e864c1a35f52bd75894baf271d94ca4db8f3b635b2a5ae5a96ffe9f5f222f512",
+      "bytes": 30469,
+      "lines": 628
     },
     {
       "path": "tests/hr-workspace.test.mjs",

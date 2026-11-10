@@ -5,6 +5,7 @@ All notable changes to Orgmetra will be documented in this file.
 ## [Unreleased]
 
 ### Documentation
+- Keep ADR 0008's accepted decision state separate from observed develop provenance and the unresolved protection gap, with an exact status/index regression. This correction does not change authorization behavior or establish protected integration.
 - Explain named workspace, story, foundation-validator, and regression-fixture helpers without changing their executable behavior. This documentation-only repair does not assert external review coverage or release acceptance.
 
 ### Fixed

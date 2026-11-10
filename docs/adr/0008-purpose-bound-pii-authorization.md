@@ -1,6 +1,7 @@
 # ADR 0008: Purpose-bound PII authorization
 
-- Status: Accepted on protected `develop`
+- Status: Accepted
+- Provenance: Observed on `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f`; configured protection remains a separate gap tracked by #89.
 - Date: 2026-08-17
 - Owners: Orgmetra Security / People API
 

@@ -197,6 +197,18 @@ test('offer approval ADR keeps its exact decision status separate from branch pr
   assert.doesNotMatch(adr, /protected `develop` truth|^Protected `develop` can govern/m);
 });
 
+test('PII authorization ADR keeps canonical status separate from source provenance', () => {
+  const adr = readFileSync(new URL('../docs/adr/0008-purpose-bound-pii-authorization.md', import.meta.url), 'utf8');
+  const index = readFileSync(new URL('../docs/adr/README.md', import.meta.url), 'utf8');
+  const statuses = [...adr.matchAll(/^- Status: (.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(statuses, ['Accepted'], 'decision status must not claim configured protection');
+  const indexed = index.split('\n').find((line) => line.includes('| [0008]'));
+  assert.ok(indexed);
+  assert.equal(indexed.split('|').at(-2).trim(), statuses[0]);
+  assert.match(adr, /^- Provenance: .*develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f.*protection.*#89/m);
+  assert.doesNotMatch(adr, /Accepted on protected/);
+});
+
 test('Job Analysis traceability includes the persisted snapshot and its contract source', () => {
   const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
   const migration = readFileSync(new URL('../database/migrations/0013_job_analysis_snapshot.sql', import.meta.url), 'utf8');
