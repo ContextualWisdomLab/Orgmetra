@@ -8,13 +8,16 @@ const actionTokens = Object.freeze({
   escalate: '--orgmetra-action-escalate'
 });
 
+/** Wrap trusted static story markup in the shared Storybook layout container; this does not sanitize HTML. */
 const frame = (content) => `<div class="storybook-frame">${content}</div>`;
 
+/** Render a static action-button example with the requested visual, disabled, loading, and focus attributes. */
 const actionButton = ({ action, label, disabled = false, loading = false, autofocus = false }) => {
   const colorToken = actionTokens[action] ?? actionTokens.review;
   return `<button class="button" style="background: var(${colorToken}); color: white" type="button"${disabled ? ' disabled' : ''}${autofocus ? ' autofocus' : ''} aria-busy="${loading}">${loading ? 'Loading…' : label}</button>`;
 };
 
+/** Render a static disconnected-state example without fetching data or issuing credentials. */
 const protectedReadNotConnected = ({ title, boundary }) => frame(`
   <section class="panel" data-figma-node-id="2:2" aria-labelledby="protected-read-not-connected-title">
     <div class="panel-heading">

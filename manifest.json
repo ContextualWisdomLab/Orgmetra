@@ -42,9 +42,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2bbe56bb8a61862e42e30fdbe0cdcf9bcd079ac7db86a3e9590a2c5f24badb16",
-      "bytes": 29549,
-      "lines": 114
+      "sha256": "822e15b352d2c18db33873fd09093c57fdcdac91eea5c7ee17c18e422a26c3c1",
+      "bytes": 29794,
+      "lines": 117
     },
     {
       "path": "CLAUDE.md",
@@ -72,9 +72,9 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "41146a85fa7c54e0fb94785ff18de2be0bd4ca96493fe85b3e65297c389df73d",
-      "bytes": 32988,
-      "lines": 500
+      "sha256": "702a16e2d0ededb507ecf83e76877aa13118677e99ec13a35cef6941f9c50a90",
+      "bytes": 34488,
+      "lines": 516
     },
     {
       "path": "apps/hr-workspace/index.html",
@@ -90,9 +90,9 @@
     },
     {
       "path": "apps/hr-workspace/workspace.stories.js",
-      "sha256": "b4e2820c3aa5e08bde95592c3d47012eecc8d3f968fe511231f2e258124d7ee5",
-      "bytes": 7641,
-      "lines": 134
+      "sha256": "1ffaae5aa70cdf72862dc527c01380395efe5588ad155b24cb84b4e57c0b466a",
+      "bytes": 7961,
+      "lines": 137
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
@@ -420,9 +420,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "79ae4f162a3bd762d16aab979da4d111416f04b9ec78797e03bf5ebb4b0b6295",
-      "bytes": 28722,
-      "lines": 704
+      "sha256": "3ab1915917ee837455b14159a6197d4890aa9cc7e5c7969159952f3121cd1a3f",
+      "bytes": 29210,
+      "lines": 709
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -432,9 +432,9 @@
     },
     {
       "path": "tests/dispatcher-inventory.test.mjs",
-      "sha256": "c1b9a05c82ffdd95fa874a26819f1be47ac2646e391b0cc86d39b0549e9431c5",
-      "bytes": 2160,
-      "lines": 47
+      "sha256": "d80e4a49b723df11b0d642a2284b7e6b9133028da79b20af450c3aaf08aa0e82",
+      "bytes": 2372,
+      "lines": 49
     },
     {
       "path": "tests/e2e/hr-workspace-core-model.spec.mjs",
@@ -444,21 +444,21 @@
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "ab57734418cae66c6936cd9901c6c2c41e975ecc4824079293f08bcb61d0f4ab",
-      "bytes": 26582,
-      "lines": 526
+      "sha256": "1041c16e6c64b9181ef1d85f8f8390d654861ccc30d16727f9f2fa4c71698b5f",
+      "bytes": 27099,
+      "lines": 531
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "bf535b963debf1855fdde59bbf1da8e94cffa4ac777d891e1323a630f88b05f0",
-      "bytes": 29053,
-      "lines": 610
+      "sha256": "7f5509bf938ae9b0ed56eb4da75149c4f5b088389eba2a1fc31567d6db413301",
+      "bytes": 29655,
+      "lines": 616
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "0e6795bd66a202eb7227049d13a7f6d7d0edf5700c1e561e9cf4af1c8a2e5e2b",
-      "bytes": 30604,
-      "lines": 563
+      "sha256": "e6c936cdb2986c095616334ec742fea03071ef00d6aeaf3ab6b5f984eea66752",
+      "bytes": 31005,
+      "lines": 567
     },
     {
       "path": "tests/job-analysis-api-fixture.mjs",

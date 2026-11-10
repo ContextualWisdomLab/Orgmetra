@@ -5,9 +5,11 @@ const jobAnalysisSnapshot = jobAnalysisApiFixture();
 
 const workspacePath = '/apps/hr-workspace/index.html';
 
+/** Install synthetic host authorization and API coordinates before loading the browser fixture. */
 async function injectProtectedReadConfig(page) {
   await page.addInitScript((snapshot) => {
     const baseUrl = window.location.origin;
+    /** Return the synthetic test credential; the validation-order fixture also counts requests for it. */
     const getAuthorization = () => 'Bearer e2e-host-token';
     window.__ORGMETRA_JOB_ANALYSIS__ = {
       baseUrl,
@@ -468,7 +470,9 @@ test('the bypass control follows the active workspace locale', async ({ page }) 
 
 test('sidebar focus and form-control boundaries retain non-text contrast', async ({ page }) => {
   await page.goto(workspacePath);
+  /** Calculate WCAG contrast between the two rendered CSS colors used by this browser assertion. */
   const ratio = (a, b) => {
+    /** Convert the fixture's RGB color channels to relative luminance for its contrast assertion. */
     const luminance = (color) => {
       const values = color.match(/[\d.]+/g).slice(0, 3).map(Number).map((v) => v / 255).map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
       return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
@@ -503,6 +507,7 @@ test('sidebar focus and form-control boundaries retain non-text contrast', async
 test('invalid protected-read forms issue no credentials or requests and explain local input', async ({ page }) => {
   await page.addInitScript(() => {
     window.__issued = 0;
+    /** Return the synthetic test credential; the validation-order fixture also counts requests for it. */
     const getAuthorization = () => { window.__issued += 1; return 'Bearer synthetic-only'; };
     window.__ORGMETRA_PEOPLE__ = { baseUrl: location.origin, tenantRecordId: 'tenant', personRecordId: 'person', effectiveOn: '2026-11-10', getAuthorization };
     window.__ORGMETRA_JOB_ANALYSIS__ = { baseUrl: location.origin, tenantRecordId: 'tenant', analysisRecordId: 'analysis', getAuthorization };

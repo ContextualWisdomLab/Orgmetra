@@ -241,6 +241,7 @@ export async function fetchPeopleRecord(config, fetchImpl = globalThis.fetch, is
   return response.json();
 }
 
+/** Update visible text, placeholders, and accessible labels for the selected locale. */
 function setLocale(locale) {
   const dictionary = translations[locale];
   document.documentElement.lang = locale;
@@ -260,6 +261,7 @@ function setLocale(locale) {
   document.getElementById('locale-toggle').textContent = locale === 'en' ? '한국어' : 'English';
 }
 
+/** Show the selected workspace view, mark its navigation button, and focus main content. */
 function activateView(viewName) {
   document.querySelectorAll('[data-view]').forEach((view) => {
     const active = view.dataset.view === viewName;
@@ -277,27 +279,32 @@ function activateView(viewName) {
   document.getElementById('main-content').focus({ preventScroll: true });
 }
 
+/** Open the identified dialog, using the hidden flag when the modal API is unavailable. */
 function openDialog(id) {
   const dialog = document.getElementById(id);
   if (typeof dialog.showModal === 'function') dialog.showModal();
   else dialog.hidden = false;
 }
 
+/** Close the identified dialog, using the hidden flag when the dialog API is unavailable. */
 function closeDialog(id) {
   const dialog = document.getElementById(id);
   if (typeof dialog.close === 'function') dialog.close();
   else dialog.hidden = true;
 }
 
+/** Clear the prior correction reason and hide its confirmation result before a new review. */
 function resetConfirmationState() {
   document.getElementById('confirmation-reason').value = '';
   document.getElementById('confirmation-status').hidden = true;
 }
 
+/** Look up a Job Analysis message in the active locale, defaulting to English. */
 function jobAnalysisMessage(key) {
   return translations[document.documentElement.dataset.locale || 'en'][key];
 }
 
+/** Set the Job Analysis status text, translation key, and request-state marker. */
 function setJobAnalysisStatus(key, state = 'idle') {
   const status = document.getElementById('job-analysis-status');
   status.dataset.i18n = key;
@@ -305,6 +312,7 @@ function setJobAnalysisStatus(key, state = 'idle') {
   status.textContent = jobAnalysisMessage(key);
 }
 
+/** Hide the previous Job Analysis result and reset every displayed evidence field. */
 function clearJobAnalysisSnapshot() {
   document.getElementById('job-analysis-result').hidden = true;
   document.getElementById('job-analysis-analysis-id').textContent = 'unknown';
@@ -315,6 +323,7 @@ function clearJobAnalysisSnapshot() {
   document.getElementById('job-analysis-ksao-count').textContent = '0';
 }
 
+/** Display snapshot identifiers and array counts, using unknown or zero for missing values. */
 function renderJobAnalysisSnapshot(snapshot) {
   const result = document.getElementById('job-analysis-result');
   const tasks = Array.isArray(snapshot?.tasks) ? snapshot.tasks : [];
@@ -328,10 +337,12 @@ function renderJobAnalysisSnapshot(snapshot) {
   result.hidden = false;
 }
 
+/** Look up a People API message in the active locale, defaulting to English. */
 function peopleApiMessage(key) {
   return translations[document.documentElement.dataset.locale || 'en'][key];
 }
 
+/** Set the People API status text, translation key, and request-state marker. */
 function setPeopleApiStatus(key, state = 'idle') {
   const status = document.getElementById('people-api-status');
   status.dataset.i18n = key;
@@ -339,12 +350,14 @@ function setPeopleApiStatus(key, state = 'idle') {
   status.textContent = peopleApiMessage(key);
 }
 
+/** Hide the previous People result and reset its displayed personal fields. */
 function clearPeopleRecord() {
   document.getElementById('people-api-result').hidden = true;
   document.getElementById('people-api-display-name').textContent = 'unknown';
   document.getElementById('people-api-employment-status').textContent = 'unknown';
 }
 
+/** Display authorized People fields; reject a missing field object before revealing the result. */
 function renderPeopleRecord(payload) {
   const fields = payload?.fields;
   if (!fields || typeof fields !== 'object') throw new Error('PEOPLE_REQUEST_FAILED');
@@ -365,6 +378,7 @@ if (typeof document !== 'undefined') {
   document.querySelectorAll('[data-open-dialog]').forEach((button) => button.addEventListener('click', () => openDialog(button.dataset.openDialog)));
   document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => closeDialog(button.dataset.closeDialog)));
   // A changed purpose needs a new explicit review; neither prior outcome remains current.
+  /** Hide both prior personal-details outcomes when the purpose changes; this is UI state, not server authorization. */
   const invalidatePersonalDetailsReview = () => {
     document.getElementById('permission-panel').hidden = true;
     document.getElementById('details-panel').hidden = true;
@@ -402,6 +416,7 @@ if (typeof document !== 'undefined') {
     setJobAnalysisStatus('jobAnalysisReady');
   }
   // Editing read coordinates invalidates pending and displayed evidence, even after reverting.
+  /** Advance the request generation, clear stale evidence, and restore the configured Job Analysis status. */
   const invalidateJobAnalysisRead = () => {
     jobAnalysisRequestVersion += 1;
     clearJobAnalysisSnapshot();
@@ -452,6 +467,7 @@ if (typeof document !== 'undefined') {
   } else {
     setPeopleApiStatus('peopleApiReady');
   }
+  /** Advance the request generation, clear stale personal fields, and restore the configured People status. */
   const invalidatePeopleRead = () => {
     peopleApiRequestVersion += 1;
     clearPeopleRecord();

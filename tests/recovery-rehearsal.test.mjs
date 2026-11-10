@@ -15,6 +15,7 @@ const provenanceFiles = Object.freeze([
   rehearsalPath
 ]);
 
+/** Count UTF-8 lines without treating a final newline as an extra empty line. */
 function lineCount(buffer) {
   const parts = buffer.toString('utf8').split(/\r?\n/);
   if (parts.at(-1) === '') {
@@ -23,6 +24,7 @@ function lineCount(buffer) {
   return parts.length;
 }
 
+/** Require the exact recovery file set and verify each retained hash, byte count, and line count. */
 function verifyRecoveryProvenance() {
   assert.equal(existsSync(provenancePath), true, `${provenancePath} must exist`);
   const manifest = JSON.parse(readFileSync(provenancePath, 'utf8'));
@@ -37,12 +39,14 @@ function verifyRecoveryProvenance() {
   }
 }
 
+/** Assert that the supplied source text matches the required contract pattern. */
 function requirePattern(text, pattern, message) {
   assert.match(text, pattern, message);
 }
 
 // Parse only the workflow's existing block-mapping grammar; reject absent or
 // duplicate keys instead of matching unrelated text elsewhere in the document.
+/** Extract one uniquely named nested workflow block using only the fixture's supported indentation grammar. */
 function workflowBlock(text, header, indent) {
   const lines = text.split(/\r?\n/);
   const starts = lines.flatMap((line, index) => line === `${' '.repeat(indent)}${header}` ? [index] : []);
@@ -53,6 +57,7 @@ function workflowBlock(text, header, indent) {
   return lines.slice(start, end).join('\n');
 }
 
+/** Require both PostgreSQL services to declare container port 5432 without a fixed host port. */
 function requireRandomServicePorts(workflow) {
   const services = workflowBlock(workflow, 'services:', 4);
   for (const service of ['source_postgres', 'restore_postgres']) {
@@ -62,6 +67,7 @@ function requireRandomServicePorts(workflow) {
   }
 }
 
+/** Record the actual rehearsal step mapping with synthetic service values; never execute its command. */
 function recordRehearsalEnvironment(workflow, services, consume) {
   const body = workflowBlock(workflow, '- name: Exercise real cross-cluster dump and restore', 6);
   const envBlock = workflowBlock(body, 'env:', 8);
@@ -86,6 +92,7 @@ function recordRehearsalEnvironment(workflow, services, consume) {
   consume(environment, run[1]);
 }
 
+/** Assert that the recorded rehearsal command receives distinct synthetic source and restore ports. */
 function requireRehearsalPortBinding(workflow) {
   const services = {
     source_postgres: { id: 'synthetic-source', ports: { 5432: 49171 } },

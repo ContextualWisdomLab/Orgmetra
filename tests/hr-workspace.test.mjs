@@ -217,6 +217,7 @@ test('People API uses host authorization and an explicit no-storage read boundar
 /** Execute the unchanged workspace handlers with an explicitly held synthetic transport. */
 function protectedReadWorkspace() {
   const nodes = new Map();
+  /** Return a stable synthetic DOM node and its recorded event handlers for one fixture identifier. */
   const node = (id) => {
     if (!nodes.has(id)) nodes.set(id, {
       value: '', hidden: true, textContent: '', dataset: {}, handlers: {},
@@ -347,6 +348,7 @@ for (const fixture of protectedReadCases) {
           return { status: 200, ok: true, json: async () => freshPayload };
         };
         const form = node(fixture.form);
+        /** Invoke the fixture's registered submit handler with an inert preventDefault callback. */
         const submit = () => form.handlers.submit({ preventDefault() {} });
         const previous = submit();
         assert.equal(providerCoordinates.length, 1, 'the real handler must enter the held provider');
@@ -410,6 +412,7 @@ for (const fixture of protectedReadCases) {
         observedAuthorities.push(authority);
         return 'Bearer fixture-only';
       };
+      /** Invoke the fixture's registered submit handler with an inert preventDefault callback. */
       const submit = () => node(fixture.form).handlers.submit({ preventDefault() {} });
       const previous = submit();
       await Promise.resolve();
@@ -487,6 +490,7 @@ for (const fixture of protectedReadCases) {
   test(`${fixture.kind} coordinate edits clear loaded values and allow a fresh explicit read`, async () => {
     const { node, pending } = protectedReadWorkspace();
     const form = node(fixture.form);
+    /** Invoke the fixture's registered submit handler with an inert preventDefault callback. */
     const submit = () => form.handlers.submit({ preventDefault() {} });
     const first = submit();
     await Promise.resolve();

@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import { REQUIRED_FILES } from '../scripts/foundation-contract-core.mjs';
 
+/** Discover sorted migration and PostgreSQL contract paths for comparison with required inventories. */
 function discoveredExecutionFiles() {
   const migrations = readdirSync(new URL('../database/migrations/', import.meta.url))
     .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name))
@@ -15,6 +16,7 @@ function discoveredExecutionFiles() {
   return Object.freeze([...migrations, ...postgresContracts]);
 }
 
+/** Read the literal Python REQUIRED list and return its paths as a set, failing if the list is absent. */
 function pythonRequiredFiles() {
   const source = readFileSync(new URL('./validate_repository.py', import.meta.url), 'utf8');
   const match = source.match(/REQUIRED = \[(.*?)\]\n\n/s);

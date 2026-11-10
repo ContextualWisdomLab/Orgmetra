@@ -213,6 +213,7 @@ export function validateDatabaseObjectNames(objectNames = DATABASE_OBJECT_NAMES)
     .map((objectName) => `Invalid database object name: ${objectName}`);
 }
 
+/** Preserve line endings and replace every other non-code SQL character with a space. */
 function maskedSqlCharacter(character) {
   return character === '\n' || character === '\r' ? character : ' ';
 }
@@ -231,6 +232,7 @@ export function maskPostgresNonCode(sqlText) {
   let output = '';
   let index = 0;
 
+  /** Mask characters up to the exclusive end offset while advancing the enclosing SQL cursor. */
   const maskThrough = (endIndex) => {
     while (index < endIndex) {
       output += maskedSqlCharacter(sqlText[index]);
@@ -417,10 +419,12 @@ export function validateAdrIndex(rootPath) {
   return errors;
 }
 
+/** Count leading whitespace characters; this helper does not expand tabs into display columns. */
 function indentationWidth(line) {
   return line.length - line.trimStart().length;
 }
 
+/** Return lines nested beneath one exact marker in the supported indentation-stable YAML subset. */
 function extractYamlBlock(yamlText, exactMarker) {
   const lines = yamlText.split(/\r?\n/);
   const startIndex = lines.findIndex((line) => line === exactMarker);
@@ -435,6 +439,7 @@ function extractYamlBlock(yamlText, exactMarker) {
   return blockLines.join('\n');
 }
 
+/** Append a labeled validation error when a required literal is absent from its selected block. */
 function requireWithin(errors, label, blockText, fragment, description) {
   if (!blockText.includes(fragment)) {
     errors.push(`${label}: missing ${description}`);

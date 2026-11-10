@@ -16,9 +16,9 @@
     },
     {
       "path": "tests/recovery-rehearsal.test.mjs",
-      "sha256": "fad6fc98717b0d44a499a02fd08c1a394ffc32dc8cb5f6e09afac1ec37cc89d7",
-      "bytes": 16028,
-      "lines": 290
+      "sha256": "86eea66b8ec1726fe55848a4b34bab757f8b007b397b598a11d0f0687e12558a",
+      "bytes": 16715,
+      "lines": 297
     },
     {
       "path": ".github/scripts/restore-rehearsal-postgres.sh",

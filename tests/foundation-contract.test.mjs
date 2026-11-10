@@ -23,10 +23,12 @@ import {
   validateMigrationBackedDatabaseObjectNames
 } from '../scripts/foundation-contract-core.mjs';
 
+/** Create a unique test directory beneath the configured operating-system temporary root. */
 function temporaryDirectory() {
   return mkdtempSync(join(tmpdir(), 'orgmetra-foundation-'));
 }
 
+/** Create fixture parent directories, write UTF-8 content, and return the resulting file path. */
 function write(root, relativePath, content = '# Valid\n') {
   const filePath = join(root, relativePath);
   mkdirSync(dirname(filePath), { recursive: true });
@@ -34,6 +36,7 @@ function write(root, relativePath, content = '# Valid\n') {
   return filePath;
 }
 
+/** Extract ordered paths from the Python validator's literal REQUIRED list, failing when absent. */
 function pythonRequiredFiles() {
   const source = readFileSync(new URL('./validate_repository.py', import.meta.url), 'utf8');
   const match = source.match(/REQUIRED = \[(.*?)\]\n\n/s);
@@ -41,6 +44,7 @@ function pythonRequiredFiles() {
   return [...match[1].matchAll(/^\s+"([^"]+)",$/gm)].map((item) => item[1]);
 }
 
+/** Write synthetic Job Analysis table declarations required by the migration-inventory fixture. */
 function writeMigrationBackedTables(root) {
   write(
     root,
@@ -55,6 +59,7 @@ function writeMigrationBackedTables(root) {
   );
 }
 
+/** Populate a synthetic foundation tree with the files, schemas, and ADR relationships required by its tests. */
 function makeMinimalValidFoundation(root) {
   for (const filePath of REQUIRED_FILES) write(root, filePath);
   write(
@@ -83,6 +88,7 @@ function makeMinimalValidFoundation(root) {
   write(root, 'docs/adr/0003-bitemporal-hris-data-contract.md', '# ADR\n\nStatus: Accepted\n');
 }
 
+/** Capture writes in memory and expose their concatenated text for CLI-output assertions. */
 function memoryStream() {
   let text = '';
   return {

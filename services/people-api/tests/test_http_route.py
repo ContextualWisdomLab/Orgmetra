@@ -25,6 +25,7 @@ class FakeAuthenticator:
     """Return one principal while recording only whether authentication ran."""
 
     def __init__(self, principal: AuthenticatedPrincipal, *, error: Exception | None = None) -> None:
+        """Store configured fixture dependencies and initialize call-recording state."""
         self.principal = principal
         self.error = error
         self.tokens: list[str] = []
@@ -41,6 +42,7 @@ class FakeReadPort:
     """Return a configured worker record and capture protected-read attempts."""
 
     def __init__(self, result: WorkerPeopleRecord | None) -> None:
+        """Store configured fixture dependencies and initialize call-recording state."""
         self.result = result
         self.calls: list[tuple[UUID, UUID, date]] = []
 
@@ -75,6 +77,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
     """Prove the HTTP boundary preserves authentication, authorization, and PII controls."""
 
     def setUp(self) -> None:
+        """Create the tenant-bound principal and purpose policy shared by each isolated route test."""
         self.principal = AuthenticatedPrincipal(
             tenant_record_id=TENANT,
             actor_reference="keyverse:actor-1",
@@ -113,6 +116,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         query: object = DEFAULT_QUERY,
         headers: object | None = None,
     ) -> tuple[int, dict[bytes, bytes], dict[str, object]]:
+        """Invoke the ASGI app with a synthetic HTTP scope and return its status, headers, and decoded JSON."""
         scope = {
             "type": "http",
             "method": method,
@@ -123,9 +127,11 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         messages: list[dict[str, object]] = []
 
         async def receive() -> dict[str, object]:
+            """Return the single synthetic ASGI input event expected by this fixture."""
             return {"type": "http.request", "body": b"", "more_body": False}
 
         async def send(message: dict[str, object]) -> None:
+            """Handle one synthetic ASGI output event without external I/O."""
             messages.append(message)
 
         await app(scope, receive, send)
@@ -143,6 +149,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             self._app(read_port=object())
 
     async def test_get_worker_returns_only_authorized_fields_with_private_cache_controls(self) -> None:
+        """Verify authorized values, private cache headers, and the exact authentication and read calls."""
         authenticator = FakeAuthenticator(self.principal)
         port = FakeReadPort(worker_record())
         app = self._app(authenticator=authenticator, read_port=port)
@@ -159,6 +166,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(port.calls, [(TENANT, PERSON, date(2026, 8, 17))])
 
     async def test_malformed_request_fails_before_authentication_or_protected_read(self) -> None:
+        """Reject malformed coordinates and query fields before authentication or protected storage access."""
         authenticator = FakeAuthenticator(self.principal)
         port = FakeReadPort(worker_record())
         app = self._app(authenticator=authenticator, read_port=port)
@@ -187,6 +195,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(port.calls, [])
 
     async def test_wrong_path_and_method_return_transport_errors_without_authentication(self) -> None:
+        """Reject unsupported routes and methods without invoking authentication or storage."""
         authenticator = FakeAuthenticator(self.principal)
         port = FakeReadPort(worker_record())
         app = self._app(authenticator=authenticator, read_port=port)
@@ -208,6 +217,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(port.calls, [])
 
     async def test_malformed_authorization_headers_are_unauthorized_without_authenticator_call(self) -> None:
+        """Reject malformed bearer headers and return the challenge without calling the authenticator."""
         authenticator = FakeAuthenticator(self.principal)
         port = FakeReadPort(worker_record())
         app = self._app(authenticator=authenticator, read_port=port)
@@ -229,6 +239,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(port.calls, [])
 
     async def test_authenticator_rejection_is_unauthorized_without_protected_read(self) -> None:
+        """Map explicit credential rejection to HTTP 401 without reading protected values."""
         authenticator = FakeAuthenticator(self.principal, error=AuthenticationFailed("expired"))
         port = FakeReadPort(worker_record())
         app = self._app(authenticator=authenticator, read_port=port)
@@ -262,6 +273,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(port.calls, [])
 
     async def test_authorization_denial_does_not_read_worker_values(self) -> None:
+        """Deny fields outside the purpose policy before consulting the worker read port."""
         port = FakeReadPort(worker_record())
         app = self._app(read_port=port)
 
@@ -271,6 +283,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(port.calls, [])
 
     async def test_missing_and_integrity_conflicts_return_non_disclosing_errors(self) -> None:
+        """Return safe missing-record and integrity-conflict errors from synthetic read results."""
         for port, expected in (
             (FakeReadPort(None), (404, "worker_not_found")),
             (FakeReadPort(worker_record(person_record_id=OTHER_PERSON)), (409, "worker_integrity_conflict")),
@@ -280,6 +293,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual((status, payload["error"]), expected)
 
     async def test_unexpected_failure_returns_generic_500_without_secret_details(self) -> None:
+        """Map an unexpected read-port fault to a generic HTTP 500 without its private diagnostic text."""
         status, _, payload = await self._request(self._app(read_port=ExplodingReadPort()))
 
         self.assertEqual((status, payload["error"]), (500, "internal_error"))
@@ -357,12 +371,15 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(port.calls, [])
 
     async def test_non_http_scope_is_rejected_as_programming_error(self) -> None:
+        """Reject a non-HTTP ASGI scope instead of attempting to serve it as a People request."""
         app = self._app(read_port=FakeReadPort(None))
 
         async def receive() -> dict[str, object]:
+            """Return the single synthetic ASGI input event expected by this fixture."""
             return {"type": "lifespan.startup"}
 
         async def send(message: dict[str, object]) -> None:
+            """Handle one synthetic ASGI output event without external I/O."""
             del message
 
         with self.assertRaisesRegex(ValueError, "HTTP ASGI scopes"):
