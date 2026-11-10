@@ -75,6 +75,7 @@ h2 { margin-bottom: 0; font-size: 20px; line-height: 1.2; letter-spacing: -0.015
 .button-secondary { border-color: var(--orgmetra-border-subtle); background: white; color: var(--orgmetra-text-primary); }
 .button-review { background: var(--orgmetra-action-review); color: white; }
 .button-review:hover { background: #163d6e; }
+.button:disabled, .button[aria-busy="true"] { opacity: 0.55; cursor: not-allowed; }
 .notice { display: flex; gap: var(--orgmetra-space-sm); margin: var(--orgmetra-space-md) 0; border-radius: var(--orgmetra-radius-md); padding: 12px 14px; }
 .notice-danger { border: 1px solid #fecaca; background: #fef2f2; color: var(--orgmetra-danger); }
 .notice-success { border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; }

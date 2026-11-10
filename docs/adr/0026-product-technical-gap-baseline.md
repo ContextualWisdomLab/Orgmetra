@@ -12,7 +12,7 @@ The product baseline also uses a Figma wireframe source and repeated HR actions.
 
 ## Decision
 
-1. `docs/product-technical-gap-baseline.md` is the current evidence ledger for buyer-visible product gaps and technical gaps.
+1. `docs/product-technical-gap-baseline.md` records the historical 2026-08-21 evidence snapshot for buyer-visible product gaps and technical gaps, with separately dated source-attribution corrections. It is not a current PR inventory or release status; its recorded PR #53 head must not be substituted for a later reviewed head.
 2. Every capability in the ledger has one maturity value: `implemented_on_protected_develop`, `implemented_on_active_pr`, `accepted_architecture`, `planned`, `research_only`, `superseded`, or `out_of_scope`.
 3. Protected-default-branch claims require current `develop` evidence. An OpenAPI definition, a passing predecessor workflow, a local branch, or a PR body cannot be presented as shipped runtime behavior.
 4. The authoritative People mutation and confirmed-hire paths are present in the observed `develop` source; configured branch protection for that source is tracked separately by issue #89 and is not claimed here. Browser workflows must preserve tenant authorization, idempotency, bitemporal history, human confirmation, audit, and outbox atomicity rather than bypassing those boundaries.

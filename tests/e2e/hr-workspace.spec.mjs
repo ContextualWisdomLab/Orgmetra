@@ -28,6 +28,26 @@ async function injectProtectedReadConfig(page) {
   }, jobAnalysisSnapshot);
 }
 
+test('action buttons distinguish disabled and loading states across variants', async ({ page }) => {
+  await page.goto(workspacePath);
+  await page.evaluate(async () => {
+    const { ActionButtons } = await import('/apps/hr-workspace/workspace.stories.js');
+    document.body.innerHTML = ActionButtons.render();
+    const controls = document.createElement('div');
+    controls.innerHTML = ['button', 'button button-review', 'button button-secondary'].map((classes) =>
+      `<button class="${classes}">Enabled</button><button class="${classes}" disabled>Disabled</button><button class="${classes}" aria-busy="true">Loading</button>`
+    ).join('');
+    document.body.append(controls);
+  });
+  const buttons = page.locator('.button');
+  for (let index = 0; index < await buttons.count(); index += 1) {
+    const button = buttons.nth(index);
+    const inactive = await button.evaluate((node) => node.disabled || node.getAttribute('aria-busy') === 'true');
+    await expect(button).toHaveCSS('opacity', inactive ? '0.55' : '1');
+    await expect(button).toHaveCSS('cursor', inactive ? 'not-allowed' : 'pointer');
+  }
+});
+
 test('human-review workspace states remain keyboard-accessible and localized', async ({ page }) => {
   await page.goto(workspacePath);
 

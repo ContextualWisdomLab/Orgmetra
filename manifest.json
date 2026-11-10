@@ -42,8 +42,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6190bd413b65843438dc30b171adb0a0235de4dfdab0e56d16b9c0b3c4155013",
-      "bytes": 29013,
+      "sha256": "2b3b364e580f8497f695d092f33cf80127607c4fb6a98484d69cc88efd77483d",
+      "bytes": 29187,
       "lines": 110
     },
     {
@@ -84,9 +84,9 @@
     },
     {
       "path": "apps/hr-workspace/styles.css",
-      "sha256": "3751c1abbd8863040cdf61adf65a4fee9d00f78a9848e4a6b01a71b06b961926",
-      "bytes": 10731,
-      "lines": 122
+      "sha256": "a8cbd09c5f8b8aa56832558ea8f323e1dc547e9f7180456cbb207fd3a554535d",
+      "bytes": 10815,
+      "lines": 123
     },
     {
       "path": "apps/hr-workspace/workspace.stories.js",
@@ -348,8 +348,8 @@
     },
     {
       "path": "docs/adr/0026-product-technical-gap-baseline.md",
-      "sha256": "222fb4e961b453fe9b8e1c931b83e5d8a24ff1d0881d85d17e9ef891ed92fe31",
-      "bytes": 3266,
+      "sha256": "230f52cabb26d1536d838278bc489922f021ca127a4e05867daf344feed1eb83",
+      "bytes": 3469,
       "lines": 32
     },
     {
@@ -444,9 +444,9 @@
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "5b9610d26c4e7c125d89ce2b9dbdbaffd9a39fb089aa7add13028771d4fea2d6",
-      "bytes": 21825,
-      "lines": 447
+      "sha256": "012e98a6bead0a443f2c69a59fcadc7375b325f0aa77eaecab990e713a3bf9fe",
+      "bytes": 22944,
+      "lines": 467
     },
     {
       "path": "tests/foundation-contract.test.mjs",
@@ -456,9 +456,9 @@
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "4589ffd8afa5f8afcb0ed725a54b60b8fe6270b7c5ea08805ebd301aa655c446",
-      "bytes": 26479,
-      "lines": 501
+      "sha256": "5c183af352bed122c111696aac602729ca0087c19cf230f63b5c034cae2e55a1",
+      "bytes": 27111,
+      "lines": 508
     },
     {
       "path": "tests/job-analysis-api-fixture.mjs",

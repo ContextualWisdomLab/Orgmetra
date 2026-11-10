@@ -170,13 +170,20 @@ test('browser Job Analysis mock uses the same authoritative document and retains
 });
 
 test('gap baseline traceability names its active-PR maturity and governing ADR', () => {
+  const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+  const gap = readFileSync(new URL('../docs/product-technical-gap-baseline.md', import.meta.url), 'utf8');
+  const baselineEntry = changelog.split('\n').find((line) => line.startsWith('- Product and technical gap baseline with'));
+  assert.match(baselineEntry, /historical 2026-08-21 open-PR inventory/);
+  assert.doesNotMatch(baselineEntry, /full current open-PR inventory|protected-branch truth/);
+  assert.match(gap, /not a current all-PR inventory/);
   const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
   const adr = readFileSync(new URL('../docs/adr/0026-product-technical-gap-baseline.md', import.meta.url), 'utf8');
   const row = traceability.split('\n').filter((line) => line.startsWith('| Product and technical gap baseline |'));
   assert.equal(row.length, 1, 'the gap baseline has one source-contract row');
   const cells = row[0].split('|').map((cell) => cell.trim());
   assert.match(adr, /^# ADR 0026: Product and technical gap baseline/m);
-  assert.match(adr, /`docs\/product-technical-gap-baseline\.md` is the current evidence ledger/);
+  assert.match(adr, /`docs\/product-technical-gap-baseline\.md` records the historical 2026-08-21 evidence snapshot/);
+  assert.match(adr, /not a current PR inventory or release status/);
   assert.equal(cells[6], 'implemented_on_active_pr', 'local candidate documentation is not protected truth');
   assert.equal(cells[5], 'ADR-0026', 'the baseline is not governed by the workspace ADR');
 });
