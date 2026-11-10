@@ -1,0 +1,49 @@
+.protected-read-state {
+  display: grid;
+  gap: var(--orgmetra-space-md);
+  max-width: 36rem;
+  padding: var(--orgmetra-space-lg);
+  border: 1px solid var(--orgmetra-border-subtle);
+  border-radius: var(--orgmetra-radius-md);
+  background: var(--orgmetra-surface-card);
+  color: var(--orgmetra-text-primary);
+}
+
+.protected-read-status,
+.protected-read-next-action {
+  display: grid;
+  gap: var(--orgmetra-space-xs);
+  margin: 0;
+}
+
+.protected-read-status span,
+.protected-read-next-action span {
+  color: var(--orgmetra-text-muted);
+}
+
+.protected-read-state[data-interaction-state="permission-denied"],
+.protected-read-state[data-interaction-state="error"] {
+  border-color: var(--orgmetra-danger);
+}
+
+.protected-read-submit {
+  justify-self: start;
+  min-height: 44px;
+  padding: var(--orgmetra-space-sm) var(--orgmetra-space-md);
+  border: 0;
+  border-radius: var(--orgmetra-radius-sm);
+  background: var(--orgmetra-action-review);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.protected-read-submit:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.protected-read-submit:focus-visible {
+  outline: 3px solid var(--orgmetra-focus-ring);
+  outline-offset: 3px;
+}
