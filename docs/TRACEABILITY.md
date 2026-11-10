@@ -32,7 +32,7 @@ The external Keyverse row instead records the accepted OIDC/API architecture. Ex
 | Least-privilege API capability | Keyverse gateway boundary | operation scope conceptual | structural per-operation scope and confused-deputy contract tests | ADR-0002 | implemented_on_active_pr |
 | Client-safe failure correlation | API error boundary | `support_reference` conceptual | error disclosure and support-lookup tests | ADR-0002 | implemented_on_active_pr |
 | Foundation artifact integrity | Repository governance | deterministic `manifest.json` file inventory | SHA-256/byte/line validation plus Python/Node inventory-equivalence regression and explicit dispatcher/validity/criterion migration and execution-contract provenance regression | ADR-0001 | implemented_on_active_pr |
-| Product and technical gap baseline | Product / platform governance | `docs/product-technical-gap-baseline.md`, maturity vocabulary, current protected head and PR inventory | Fresh local contract/coverage evidence plus current GitHub head/review/check inventory | ADR-0026 | implemented_on_active_pr |
+| Product and technical gap baseline | Product / platform governance | `docs/product-technical-gap-baseline.md`, maturity vocabulary, historical 2026-08-21 baseline | Recorded historical PR inventory and local execution results; not current protected-head, PR-inventory, or latest local-validation evidence | ADR-0026 | implemented_on_active_pr |
 
 ## 4. CWL integration traceability
 

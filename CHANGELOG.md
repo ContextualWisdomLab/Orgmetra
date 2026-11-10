@@ -4,6 +4,10 @@ All notable changes to Orgmetra will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Validate protected-read coordinates before requesting host credentials and distinguish local input errors in both workspace languages. Correct the home anchor and improve sidebar-focus and form-control border contrast.
+- Align schema, ADR, runner prerequisites, and historical gap-baseline traceability documentation with their actual source scope.
+
 ### Added
 
 - Active-PR isolated-runner PostgreSQL client repair: host `psql` availability on the `CWL CI isolated` runners varies by job; the logs do not show a fixed per-runner client. Restore rehearsal job 112192671013 on `orgmetra-ci-01` (attempt 3) was the first to stop at `.github/scripts/restore-rehearsal-postgres.sh` line 59 with `psql: command not found` (exit 127), and job 112199226633 on `keyverse-ci-01` (attempt 4) stopped the same way. Foundation job 112192669065 on `keyverse-ci-01` stopped after 30 failed `psql` readiness probes, while Foundation job 112199223734 on `orgmetra-ci-01` reached PostgreSQL. Both workflows now install Ubuntu `postgresql-client-16`, put `/usr/lib/postgresql/16/bin` first on the job path, and prove in a later step that the selected `psql` is that binary with major version 16 before the first host `psql` use. The source contract detects host `psql` written as a bare or absolute command, after `env` or `bash -c`, or chained after a `docker exec` segment, and host scripts that call `psql` when run through `bash` (with or without flags), `sh`, `source`, `.` or `./`; it ignores `psql` only inside a `docker exec` segment. Commands that do not name `psql` or the script path literally, such as a variable that holds the command, are not detected. Database images, contract scripts, runner selectors and all quality gates are unchanged; this source change is not a passing hosted run, approval, or release.

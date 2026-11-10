@@ -23,6 +23,7 @@ Object.assign(translations.en, {
   jobAnalysisLoaded: 'Snapshot loaded from the protected Job Analysis API.',
   jobAnalysisDenied: 'The protected API denied this request. Verify the purpose and host authorization.',
   jobAnalysisFailed: 'The protected API could not return this snapshot. No local fallback was used.',
+  jobAnalysisInvalidInput: 'Check the tenant and analysis record IDs before requesting a snapshot.',
   jobAnalysisSummary: 'Snapshot evidence',
   jobAnalysisAnalysisId: 'Analysis record',
   jobAnalysisStatus: 'Status',
@@ -46,6 +47,7 @@ Object.assign(translations.en, {
   peopleApiLoaded: 'Worker record loaded from the protected People API.',
   peopleApiDenied: 'The protected People API denied this request. Verify purpose and authorization.',
   peopleApiFailed: 'The protected People API could not return this record. No local fallback was used.',
+  peopleApiInvalidInput: 'Check the tenant, person, effective date, and requested fields before requesting a record.',
   peopleApiDisplayName: 'Authorized display name',
   peopleApiEmploymentStatus: 'Employment status',
   peopleApiNoValues: 'No protected People API values loaded.',
@@ -66,6 +68,7 @@ Object.assign(translations.ko, {
   jobAnalysisLoaded: '보호된 직무 분석 API에서 스냅샷을 불러왔습니다.',
   jobAnalysisDenied: '보호된 API가 요청을 거부했습니다. 목적과 호스트 인증을 확인하세요.',
   jobAnalysisFailed: '보호된 API에서 이 스냅샷을 반환하지 못했습니다. 로컬 대체 데이터는 사용하지 않았습니다.',
+  jobAnalysisInvalidInput: '스냅샷을 요청하기 전에 테넌트와 분석 레코드 ID를 확인하세요.',
   jobAnalysisSummary: '스냅샷 근거',
   jobAnalysisAnalysisId: '분석 레코드',
   jobAnalysisStatus: '상태',
@@ -89,6 +92,7 @@ Object.assign(translations.ko, {
   peopleApiLoaded: '보호된 People API에서 근로자 레코드를 불러왔습니다.',
   peopleApiDenied: '보호된 People API가 요청을 거부했습니다. 목적과 인증을 확인하세요.',
   peopleApiFailed: '보호된 People API에서 레코드를 반환하지 못했습니다. 로컬 대체 데이터는 사용하지 않았습니다.',
+  peopleApiInvalidInput: '레코드를 요청하기 전에 테넌트, 사람 레코드 ID, 효력일과 요청 필드를 확인하세요.',
   peopleApiDisplayName: '권한이 부여된 표시 이름',
   peopleApiEmploymentStatus: '고용 상태',
   peopleApiNoValues: '불러온 보호된 People API 값이 없습니다.',
@@ -145,12 +149,20 @@ export async function fetchJobAnalysisSnapshot(config, fetchImpl = globalThis.fe
     throw new Error('Job Analysis API authorization provider is not configured.');
   }
   if (typeof fetchImpl !== 'function') throw new Error('Fetch is unavailable.');
+  let url;
+  try {
+    url = jobAnalysisSnapshotUrl(config);
+  } catch {
+    const error = new Error('Invalid workspace read coordinates.');
+    error.code = 'INVALID_WORKSPACE_INPUT';
+    throw error;
+  }
   const authorization = await config.getAuthorization();
   if (typeof authorization !== 'string' || !authorization.trim()) {
     throw new Error('Job Analysis API authorization provider returned no credential.');
   }
   if (!isCurrentRequest()) throw new Error('OBSOLETE_WORKSPACE_READ');
-  const response = await fetchImpl(jobAnalysisSnapshotUrl(config), {
+  const response = await fetchImpl(url, {
     headers: {
       Authorization: authorization,
       'X-Purpose-Code': config.purposeCode || 'job_analysis_read',
@@ -207,12 +219,20 @@ export async function fetchPeopleRecord(config, fetchImpl = globalThis.fetch, is
     throw new Error('People API authorization provider is not configured.');
   }
   if (typeof fetchImpl !== 'function') throw new Error('Fetch is unavailable.');
+  let url;
+  try {
+    url = peopleRecordUrl(config);
+  } catch {
+    const error = new Error('Invalid workspace read coordinates.');
+    error.code = 'INVALID_WORKSPACE_INPUT';
+    throw error;
+  }
   const authorization = await config.getAuthorization();
   if (typeof authorization !== 'string' || !authorization.trim()) {
     throw new Error('People API authorization provider returned no credential.');
   }
   if (!isCurrentRequest()) throw new Error('OBSOLETE_WORKSPACE_READ');
-  const response = await fetchImpl(peopleRecordUrl(config), {
+  const response = await fetchImpl(url, {
     headers: { Authorization: authorization },
     credentials: 'omit',
   });
@@ -417,7 +437,7 @@ if (typeof document !== 'undefined') {
     } catch (error) {
       if (requestVersion !== jobAnalysisRequestVersion) return;
       clearJobAnalysisSnapshot();
-      setJobAnalysisStatus(error.message === 'JOB_ANALYSIS_ACCESS_DENIED' ? 'jobAnalysisDenied' : 'jobAnalysisFailed', 'error');
+      setJobAnalysisStatus(error.code === 'INVALID_WORKSPACE_INPUT' ? 'jobAnalysisInvalidInput' : error.message === 'JOB_ANALYSIS_ACCESS_DENIED' ? 'jobAnalysisDenied' : 'jobAnalysisFailed', 'error');
     }
   });
   const peopleApiForm = document.getElementById('people-api-form');
@@ -469,7 +489,7 @@ if (typeof document !== 'undefined') {
     } catch (error) {
       if (requestVersion !== peopleApiRequestVersion) return;
       clearPeopleRecord();
-      setPeopleApiStatus(error.message === 'PEOPLE_ACCESS_DENIED' ? 'peopleApiDenied' : 'peopleApiFailed', 'error');
+      setPeopleApiStatus(error.code === 'INVALID_WORKSPACE_INPUT' ? 'peopleApiInvalidInput' : error.message === 'PEOPLE_ACCESS_DENIED' ? 'peopleApiDenied' : 'peopleApiFailed', 'error');
     }
   });
   document.addEventListener('orgmetra:authority-invalidated', () => {

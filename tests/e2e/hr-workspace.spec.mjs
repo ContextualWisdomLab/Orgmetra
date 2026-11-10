@@ -465,3 +465,62 @@ test('the bypass control follows the active workspace locale', async ({ page }) 
   await expect(skipLink.locator('[lang="en"]')).toBeHidden();
   await expect(skipLink).toHaveAccessibleName('본문으로 건너뛰기');
 });
+
+test('sidebar focus and form-control boundaries retain non-text contrast', async ({ page }) => {
+  await page.goto(workspacePath);
+  const ratio = (a, b) => {
+    const luminance = (color) => {
+      const values = color.match(/[\d.]+/g).slice(0, 3).map(Number).map((v) => v / 255).map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
+    };
+    const x = luminance(a), y = luminance(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+  const brand = page.locator('.brand');
+  await brand.focus();
+  expect(await brand.evaluate((n) => n.matches(':focus-visible'))).toBe(true);
+  const focus = await brand.evaluate((n) => ({ ring: getComputedStyle(n).outlineColor, background: getComputedStyle(n.closest('.sidebar')).backgroundColor }));
+  expect(ratio(focus.ring, focus.background)).toBeGreaterThanOrEqual(3);
+  for (const selector of ['[data-view-link="employee-profile"]', '[data-view-link="job-analysis"]']) {
+    const nav = page.locator(selector).first();
+    await nav.focus();
+    const colors = await nav.evaluate((n) => ({ ring: getComputedStyle(n).outlineColor, background: getComputedStyle(n.closest('.sidebar')).backgroundColor }));
+    expect(ratio(colors.ring, colors.background)).toBeGreaterThanOrEqual(3);
+  }
+  await page.locator('[data-view-link="employee-profile"]').first().click();
+  const fields = page.locator('input, textarea, .select-field');
+  for (let i = 0; i < await fields.count(); i += 1) {
+    const colors = await fields.nth(i).evaluate((n) => ({ border: getComputedStyle(n).borderTopColor, background: getComputedStyle(n).backgroundColor }));
+    expect(ratio(colors.border, colors.background)).toBeGreaterThanOrEqual(3);
+  }
+  const locale = page.locator('#locale-toggle');
+  await page.keyboard.press('Tab');
+  await locale.focus();
+  expect(await locale.evaluate((n) => n.matches(':focus-visible'))).toBe(true);
+  await expect(locale).toHaveCSS('outline-color', 'rgb(29, 78, 137)');
+});
+
+test('invalid protected-read forms issue no credentials or requests and explain local input', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__issued = 0;
+    const getAuthorization = () => { window.__issued += 1; return 'Bearer synthetic-only'; };
+    window.__ORGMETRA_PEOPLE__ = { baseUrl: location.origin, tenantRecordId: 'tenant', personRecordId: 'person', effectiveOn: '2026-11-10', getAuthorization };
+    window.__ORGMETRA_JOB_ANALYSIS__ = { baseUrl: location.origin, tenantRecordId: 'tenant', analysisRecordId: 'analysis', getAuthorization };
+  });
+  let sends = 0;
+  await page.route('**/v1/**', (route) => { sends += 1; return route.fulfill({ status: 500, body: '{}' }); });
+  await page.goto(workspacePath);
+  for (const [view, prefix, key] of [['employee-profile', 'people-api', 'peopleApiInvalidInput'], ['job-analysis', 'job-analysis', 'jobAnalysisInvalidInput']]) {
+    await page.locator(`[data-view-link="${view}"]`).first().click();
+    await page.locator(`#${prefix}-tenant`).fill('');
+    await page.locator(`#${prefix}-form button[type="submit"]`).click();
+    await expect(page.locator(`#${prefix}-status`)).toHaveAttribute('data-i18n', key);
+    await expect(page.locator(`#${prefix}-status`)).toContainText('Check');
+    await page.locator('#locale-toggle').click();
+    await expect(page.locator(`#${prefix}-status`)).toContainText('확인');
+    await page.locator('#locale-toggle').click();
+    await expect(page.locator(`#${prefix}-result`)).toBeHidden();
+  }
+  expect(await page.evaluate(() => window.__issued)).toBe(0);
+  expect(sends).toBe(0);
+});

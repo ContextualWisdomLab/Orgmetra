@@ -506,3 +506,58 @@ for (const fixture of protectedReadCases) {
     assert.equal(node(fixture.status).dataset.state, 'loaded');
   });
 }
+
+for (const [kind, fetchRecord, config, invalidInputs] of [
+  ['People', fetchPeopleRecord, { baseUrl: 'https://people.example.test', tenantRecordId: 'tenant', personRecordId: 'person', effectiveOn: '2026-11-10', requestedFields: ['display_name'] }, [{ tenantRecordId: '' }, { personRecordId: ' ' }, { effectiveOn: '' }, { requestedFields: [] }]],
+  ['Job Analysis', fetchJobAnalysisSnapshot, { baseUrl: 'https://job.example.test', tenantRecordId: 'tenant', analysisRecordId: 'analysis' }, [{ tenantRecordId: '' }, { analysisRecordId: ' ' }]],
+]) {
+  test(`${kind} validates read coordinates before requesting credentials`, async () => {
+    for (const invalid of invalidInputs) {
+      let issued = 0;
+      let sent = 0;
+      await assert.rejects(fetchRecord({ ...config, ...invalid, getAuthorization: () => { issued += 1; return 'Bearer synthetic'; } }, async () => { sent += 1; return { ok: true, status: 200, json: async () => ({}) }; }), (error) => error.code === 'INVALID_WORKSPACE_INPUT');
+      assert.equal(issued, 0, 'invalid coordinates must not issue a credential');
+      assert.equal(sent, 0, 'invalid coordinates must not dispatch');
+    }
+    let issued = 0;
+    let sent = 0;
+    const value = await fetchRecord({ ...config, getAuthorization: () => { issued += 1; return 'Bearer synthetic'; } }, async () => { sent += 1; return { ok: true, status: 200, json: async () => ({ valid: true }) }; });
+    assert.deepEqual(value, { valid: true });
+    assert.equal(issued, 1);
+    assert.equal(sent, 1);
+    await assert.rejects(fetchRecord({ ...config, getAuthorization: () => { throw new Error('provider unavailable'); } }, async () => { throw new Error('must not send'); }), /provider unavailable/);
+  });
+}
+
+for (const fixture of protectedReadCases) {
+  test(`${fixture.kind} form distinguishes local invalid input from API failures in both locales`, async () => {
+    const { node, context } = protectedReadWorkspace();
+    const host = fixture.kind === 'People' ? context.__ORGMETRA_PEOPLE__ : context.__ORGMETRA_JOB_ANALYSIS__;
+    let issued = 0;
+    let sent = 0;
+    host.getAuthorization = () => { issued += 1; return 'Bearer synthetic'; };
+    context.fetch = async () => { sent += 1; return { ok: false, status: 500 }; };
+    const prefix = fixture.kind === 'People' ? 'people-api' : 'job-analysis';
+    for (const locale of ['en', 'ko']) {
+      context.document.documentElement.dataset.locale = locale;
+      node(`${prefix}-tenant`).value = '';
+      await node(fixture.form).handlers.submit({ preventDefault() {} });
+      assert.equal(node(fixture.status).dataset.i18n, fixture.kind === 'People' ? 'peopleApiInvalidInput' : 'jobAnalysisInvalidInput');
+      assert.equal(node(fixture.status).dataset.state, 'error');
+      assert.match(node(fixture.status).textContent, locale === 'en' ? /Check/ : /확인/);
+      assert.equal(node(fixture.result).hidden, true);
+      assert.equal(issued, 0);
+      assert.equal(sent, 0);
+    }
+    node(`${prefix}-tenant`).value = 'tenant-fixture';
+    await node(fixture.form).handlers.submit({ preventDefault() {} });
+    assert.equal(node(fixture.status).dataset.i18n, fixture.kind === 'People' ? 'peopleApiFailed' : 'jobAnalysisFailed');
+    assert.equal(issued, 1);
+    assert.equal(sent, 1);
+  });
+}
+
+test('brand anchor points at the home view while retaining the view selector', () => {
+  assert.match(html, /class="brand" href="#view-hr-home" data-view-link="hr-home"/);
+  assert.match(html, /id="view-hr-home"/);
+});

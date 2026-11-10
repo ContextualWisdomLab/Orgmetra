@@ -1,5 +1,6 @@
 :root {
   --workspace-sidebar: #0f172a;
+  --workspace-control-border: #64748b;
   --workspace-sidebar-muted: #aeb9ca;
   --workspace-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
 }
@@ -9,6 +10,7 @@ body { margin: 0; background: var(--orgmetra-surface-page); color: var(--orgmetr
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--orgmetra-focus-ring); outline-offset: 2px; }
+.sidebar :focus-visible { outline-color: white; }
 .skip-link { position: fixed; top: var(--orgmetra-space-sm); left: var(--orgmetra-space-sm); z-index: 1000; transform: translateY(calc(-100% - var(--orgmetra-space-lg))); border: 2px solid var(--orgmetra-action-review); border-radius: var(--orgmetra-radius-md); padding: 10px 14px; background: var(--orgmetra-surface-card); color: var(--orgmetra-text-primary); font-weight: 700; text-decoration: none; }
 .skip-link:focus, .skip-link:focus-visible { transform: translateY(0); }
 html[lang="en"] .skip-link [lang="ko"], html[lang="ko"] .skip-link [lang="en"] { display: none; }
@@ -69,7 +71,7 @@ h2 { margin-bottom: 0; font-size: 20px; line-height: 1.2; letter-spacing: -0.015
 .concept-card small { color: var(--orgmetra-text-muted); font-size: 13px; }
 .profile-toolbar { display: flex; align-items: end; justify-content: space-between; gap: var(--orgmetra-space-md); margin: var(--orgmetra-space-lg) 0; }
 .field-label { display: grid; gap: 6px; color: var(--orgmetra-text-muted); font-size: 13px; font-weight: 700; }
-.select-field, input, textarea { min-height: 42px; border: 1px solid var(--orgmetra-border-subtle); border-radius: var(--orgmetra-radius-md); padding: 8px 10px; background: white; color: var(--orgmetra-text-primary); }
+.select-field, input, textarea { min-height: 42px; border: 1px solid var(--workspace-control-border); border-radius: var(--orgmetra-radius-md); padding: 8px 10px; background: white; color: var(--orgmetra-text-primary); }
 .toolbar-actions, .dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--orgmetra-space-sm); }
 .button { border: 1px solid transparent; border-radius: var(--orgmetra-radius-md); padding: 9px 14px; font-weight: 700; }
 .button-secondary { border-color: var(--orgmetra-border-subtle); background: white; color: var(--orgmetra-text-primary); }
