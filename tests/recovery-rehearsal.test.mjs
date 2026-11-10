@@ -125,10 +125,20 @@ test('recovery port contract rejects either fixed host mapping', () => {
   const workflow = readFileSync(workflowPath, 'utf8');
   requireRandomServicePorts(workflow);
   for (const [service, mapping] of [['source_postgres', '5432:5432'], ['restore_postgres', '5433:5432']]) {
+    const header = `      ${service}:\n`;
+    const start = workflow.indexOf(header);
+    assert.notEqual(start, -1, `require ${service} header`);
+    assert.equal(workflow.indexOf(header, start + header.length), -1, `require unique ${service} header`);
     const body = workflowBlock(workflowBlock(workflow, 'services:', 4), `${service}:`, 6);
-    const mutant = workflow.replace(body, body.replace('- 5432', `- ${mapping}`));
+    const ports = workflowBlock(body, 'ports:', 8);
+    assert.equal(ports.trim(), '- 5432');
+    const mutant = workflow.slice(0, start) + workflow.slice(start).replace('- 5432', `- ${mapping}`);
+    const services = workflowBlock(mutant, 'services:', 4);
+    assert.equal(workflowBlock(workflowBlock(services, `${service}:`, 6), 'ports:', 8).trim(), `- ${mapping}`);
+    const sibling = service === 'source_postgres' ? 'restore_postgres' : 'source_postgres';
+    assert.equal(workflowBlock(services, `${sibling}:`, 6), workflowBlock(workflowBlock(workflow, 'services:', 4), `${sibling}:`, 6));
     assert.notEqual(mutant, workflow);
-    assert.throws(() => requireRandomServicePorts(mutant), { code: 'ERR_ASSERTION' });
+    assert.throws(() => requireRandomServicePorts(mutant), { code: 'ERR_ASSERTION', message: new RegExp(service) });
   }
 });
 

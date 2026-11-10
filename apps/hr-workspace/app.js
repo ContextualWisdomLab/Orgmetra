@@ -437,6 +437,10 @@ if (typeof document !== 'undefined') {
     }
     const requestVersion = ++jobAnalysisRequestVersion;
     clearJobAnalysisSnapshot();
+    if (!document.getElementById('job-analysis-purpose').value.trim()) {
+      setJobAnalysisStatus('jobAnalysisInvalidInput', 'error');
+      return;
+    }
     const config = {
       ...(jobAnalysisConfig || {}),
       tenantRecordId: document.getElementById('job-analysis-tenant').value,
@@ -488,6 +492,10 @@ if (typeof document !== 'undefined') {
     }
     const requestVersion = ++peopleApiRequestVersion;
     clearPeopleRecord();
+    if (!document.getElementById('people-api-purpose').value.trim()) {
+      setPeopleApiStatus('peopleApiInvalidInput', 'error');
+      return;
+    }
     const config = {
       ...(peopleApiConfig || {}),
       tenantRecordId: document.getElementById('people-api-tenant').value,

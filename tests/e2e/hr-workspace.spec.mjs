@@ -504,6 +504,51 @@ test('sidebar focus and form-control boundaries retain non-text contrast', async
   await expect(locale).toHaveCSS('outline-color', 'rgb(29, 78, 137)');
 });
 
+for (const [view, prefix, key] of [['employee-profile', 'people-api', 'peopleApiInvalidInput'], ['job-analysis', 'job-analysis', 'jobAnalysisInvalidInput']]) {
+  test(`${prefix} rejects empty and whitespace purpose before issuing credentials`, async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__issued = 0;
+      /** Count synthetic credential requests so blank-purpose rejection proves pre-issuance ordering. */
+      const getAuthorization = () => { window.__issued += 1; return 'Bearer synthetic-purpose-only'; };
+      window.__ORGMETRA_PEOPLE__ = { baseUrl: location.origin, tenantRecordId: 'tenant', personRecordId: 'person', effectiveOn: '2026-11-10', getAuthorization };
+      window.__ORGMETRA_JOB_ANALYSIS__ = { baseUrl: location.origin, tenantRecordId: 'tenant', analysisRecordId: 'analysis', getAuthorization };
+    });
+    let sends = 0;
+    const purposes = [];
+    await page.route('**/v1/**', async (route) => {
+      sends += 1;
+      purposes.push(prefix === 'people-api' ? new URL(route.request().url()).searchParams.get('purpose') : (await route.request().allHeaders())['x-purpose-code']);
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(prefix === 'people-api' ? { fields: { display_name: 'Purpose fixture', employment_status_code: 'active' } } : jobAnalysisSnapshot) });
+    });
+    await page.goto(workspacePath);
+    await page.locator(`[data-view-link="${view}"]`).first().click();
+    const purpose = page.locator(`#${prefix}-purpose`);
+    const submit = page.locator(`#${prefix}-form button[type="submit"]`);
+    await submit.click();
+    await expect(page.locator(`#${prefix}-result`)).toBeVisible();
+    expect(await page.evaluate(() => window.__issued)).toBe(1);
+    expect(sends).toBe(1);
+    for (const value of ['', '   ']) {
+      await purpose.fill(value);
+      await submit.click();
+      await expect(page.locator(`#${prefix}-status`)).toHaveAttribute('data-i18n', key);
+      await expect(page.locator(`#${prefix}-status`)).toHaveAttribute('data-state', 'error');
+      await expect(page.locator(`#${prefix}-result`)).toBeHidden();
+      expect(await page.evaluate(() => window.__issued)).toBe(1);
+      expect(sends).toBe(1);
+    }
+    await page.locator('#locale-toggle').click();
+    await expect(page.locator(`#${prefix}-status`)).toContainText('확인');
+    await purpose.fill('specific_review');
+    await submit.click();
+    await expect(page.locator(`#${prefix}-status`)).toHaveAttribute('data-state', 'loaded');
+    await expect(page.locator(`#${prefix}-result`)).toBeVisible();
+    expect(await page.evaluate(() => window.__issued)).toBe(2);
+    expect(sends).toBe(2);
+    expect(purposes).toEqual([prefix === 'people-api' ? 'people_read' : 'job_analysis_read', 'specific_review']);
+  });
+}
+
 test('invalid protected-read forms issue no credentials or requests and explain local input', async ({ page }) => {
   await page.addInitScript(() => {
     window.__issued = 0;
